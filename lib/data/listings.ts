@@ -1,5 +1,4 @@
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
-import { PUBLIC_LISTING_STATUS } from "@/lib/listing-lifecycle";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -100,6 +99,7 @@ export type FeedFilters = {
 };
 
 const PAGE_SIZE = 20;
+const PUBLIC_LISTING_STATUS = "active";
 
 type FilterableListingsQuery<T> = {
   eq: (column: string, value: unknown) => T;
