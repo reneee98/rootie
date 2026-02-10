@@ -26,12 +26,12 @@ function ListingCardCell({ listing }: { listing: ListingCard }) {
       )}
       aria-label={`${listing.plant_name}, ${priceLabel}`}
     >
-      <div className="relative aspect-square w-full bg-muted">
+      <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-muted">
         {listing.first_photo_url ? (
           <img
             src={listing.first_photo_url}
             alt=""
-            className="size-full object-cover"
+            className="absolute inset-0 size-full object-cover object-center"
           />
         ) : (
           <span className="text-muted-foreground flex size-full items-center justify-center text-xs">

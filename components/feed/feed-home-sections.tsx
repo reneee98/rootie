@@ -1,6 +1,7 @@
 "use client";
 
 import { FeedListingCardComponent } from "@/components/feed/feed-listing-card";
+import { AuthPromptBanner } from "@/components/feed/auth-prompt-banner";
 import type { FeedListingCard } from "@/lib/data/listings";
 
 type FeedHomeSectionsProps = {
@@ -20,26 +21,23 @@ export function FeedHomeSections({
   isAuthenticated,
   loadMoreSlot,
 }: FeedHomeSectionsProps) {
-  const showTrending =
-    trendingInRegion.length > 0;
+  const showTrending = trendingInRegion.length > 0;
   const showEndingSoon = endingSoon.length > 0;
 
   return (
     <div className="space-y-6">
-      {/* A) Trending v kraji — carousel */}
+      {/* A) Trending v kraji — carousel, jedna karta na „stránku“ */}
       {showTrending && (
         <section aria-label="Trending v kraji">
-          <h2 className="mb-2 text-sm font-semibold">
-            Trending v kraji
-          </h2>
+          <h2 className="mb-2 text-sm font-semibold">Trending v kraji</h2>
           <div
-            className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex snap-x snap-mandatory items-stretch gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             role="list"
           >
             {trendingInRegion.map((listing) => (
               <div
                 key={listing.id}
-                className="w-[160px] shrink-0 sm:w-[180px]"
+                className="w-[160px] shrink-0 snap-start sm:w-[180px]"
                 role="listitem"
               >
                 <FeedListingCardComponent
@@ -52,12 +50,15 @@ export function FeedHomeSections({
         </section>
       )}
 
+      {/* Auth prompt — between trending and rest, only for guests */}
+      {!isAuthenticated && <AuthPromptBanner />}
+
       {/* B) Končí čoskoro — horizontal scroll */}
       {showEndingSoon && (
         <section aria-label="Končí čoskoro">
           <h2 className="mb-2 text-sm font-semibold">Končí čoskoro</h2>
           <div
-            className="flex gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            className="flex items-stretch gap-3 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
             role="list"
           >
             {endingSoon.map((listing) => (

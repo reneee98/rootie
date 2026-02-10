@@ -2,28 +2,12 @@
 
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/formatters";
+import { getConditionLabel, getSizeLabel } from "@/lib/listing-labels";
 import type { ListingDraft, StepErrors } from "./wizard-shell";
 
 /* ------------------------------------------------------------------ */
 /* Label maps                                                          */
 /* ------------------------------------------------------------------ */
-
-const CONDITION_LABELS: Record<string, string> = {
-  healthy: "Zdravá",
-  slightly_damaged: "Mierne poškodená",
-  needs_care: "Potrebuje starostlivosť",
-  cutting: "Odrezok",
-  seedling: "Semenáčik",
-  rooted_cutting: "Zakorenený odrezok",
-};
-
-const SIZE_LABELS: Record<string, string> = {
-  mini: "Mini (do 10 cm)",
-  small: "Malá (10–25 cm)",
-  medium: "Stredná (25–50 cm)",
-  large: "Veľká (50–100 cm)",
-  xl: "XL (nad 100 cm)",
-};
 
 const DURATION_LABELS: Record<string, string> = {
   "24h": "24 hodín",
@@ -83,7 +67,7 @@ export function StepReview({ draft, errors, publishError, onGoToStep }: Props) {
               </span>
               {draft.swapEnabled && (
                 <Badge variant="secondary" className="text-[10px]">
-                  Swap
+                  Výmena
                 </Badge>
               )}
             </div>
@@ -119,14 +103,14 @@ export function StepReview({ draft, errors, publishError, onGoToStep }: Props) {
         {draft.condition && (
           <SummaryRow
             label="Stav"
-            value={CONDITION_LABELS[draft.condition] || draft.condition}
+            value={getConditionLabel(draft.condition)}
           />
         )}
 
         {draft.size && (
           <SummaryRow
             label="Veľkosť"
-            value={SIZE_LABELS[draft.size] || draft.size}
+            value={getSizeLabel(draft.size)}
           />
         )}
 

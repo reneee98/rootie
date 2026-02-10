@@ -22,7 +22,7 @@ function isProtectedPath(pathname: string) {
 }
 
 function isAuthPage(pathname: string) {
-  return pathname === "/welcome" || pathname === "/login" || pathname === "/signup";
+  return pathname === "/login" || pathname === "/signup";
 }
 
 export async function middleware(request: NextRequest) {
@@ -73,7 +73,6 @@ export const config = {
     "/wanted/create",
     "/admin",
     "/admin/:path*",
-    "/welcome",
     "/login",
     "/signup",
     "/api/posting/:path*",

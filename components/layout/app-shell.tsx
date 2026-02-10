@@ -3,13 +3,14 @@ import Link from "next/link";
 import { Leaf } from "lucide-react";
 
 import { MobileBottomNav } from "@/components/layout/mobile-bottom-nav";
-import { Button } from "@/components/ui/button";
+import { AppShellHeaderAuth } from "@/components/layout/app-shell-header-auth";
 
 type AppShellProps = {
   children: ReactNode;
+  isAuthenticated?: boolean;
 };
 
-export function AppShell({ children }: AppShellProps) {
+export function AppShell({ children, isAuthenticated = false }: AppShellProps) {
   return (
     <div className="bg-muted/25 min-h-dvh">
       <div className="bg-background mx-auto flex min-h-dvh w-full max-w-md flex-col border-x shadow-sm">
@@ -22,23 +23,7 @@ export function AppShell({ children }: AppShellProps) {
               <Leaf className="size-4" />
               Rootie
             </Link>
-            <div className="flex items-center gap-2">
-              <Link
-                href="/saved"
-                className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
-              >
-                Uložené
-              </Link>
-              <Link
-                href="/wanted"
-                className="text-muted-foreground hover:text-foreground text-sm font-medium transition-colors"
-              >
-                Hľadám
-              </Link>
-              <Button size="sm" variant="outline">
-                Beta
-              </Button>
-            </div>
+            <AppShellHeaderAuth isAuthenticated={isAuthenticated} />
           </div>
         </header>
 
@@ -46,7 +31,7 @@ export function AppShell({ children }: AppShellProps) {
           {children}
         </main>
 
-        <MobileBottomNav />
+        <MobileBottomNav isAuthenticated={isAuthenticated} />
       </div>
     </div>
   );

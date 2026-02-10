@@ -1,3 +1,5 @@
+import { Heart } from "lucide-react";
+
 import { requireUser } from "@/lib/auth";
 import { getSavedListings } from "@/lib/data/listings";
 import { FeedListingCardComponent } from "@/components/feed/feed-listing-card";
@@ -19,7 +21,10 @@ export default async function SavedPage({ searchParams }: SavedPageProps) {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-lg font-semibold">Uložené inzeráty</h1>
+      <h1 className="flex items-center gap-2 text-lg font-semibold">
+        <Heart className="size-5 shrink-0 fill-current text-primary" aria-hidden />
+        Uložené inzeráty
+      </h1>
 
       <SavedListingsFilters currentRegion={region} />
 
@@ -29,7 +34,7 @@ export default async function SavedPage({ searchParams }: SavedPageProps) {
             Nemáte uložené žiadne inzeráty.
           </p>
           <p className="text-muted-foreground text-xs">
-            Kliknite na ikonu záložky pri inzeráte a objavia sa tu.
+            Kliknite na srdce pri inzeráte a objavia sa tu.
           </p>
         </div>
       ) : (

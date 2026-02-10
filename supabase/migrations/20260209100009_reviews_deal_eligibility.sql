@@ -8,14 +8,26 @@ create table if not exists public.thread_deal_confirmations (
   thread_id uuid not null references public.threads (id) on delete cascade,
   user_id uuid not null references public.profiles (id) on delete cascade,
   confirmed_at timestamptz not null default now(),
-  primary key (thread_id, user_id),
-  constraint thread_deal_confirmation_participant check (
-    exists (
-      select 1 from public.threads t
-      where t.id = thread_id and (t.user1_id = user_id or t.user2_id = user_id)
-    )
-  )
+  primary key (thread_id, user_id)
 );
+
+-- Enforce participant check via trigger (subquery not allowed in CHECK on hosted Postgres)
+create or replace function public.thread_deal_confirmation_participant_check()
+returns trigger as $$
+begin
+  if not exists (
+    select 1 from public.threads t
+    where t.id = new.thread_id and (t.user1_id = new.user_id or t.user2_id = new.user_id)
+  ) then
+    raise exception 'user_id must be a participant of the thread';
+  end if;
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger thread_deal_confirmation_participant_trigger
+  before insert on public.thread_deal_confirmations
+  for each row execute function public.thread_deal_confirmation_participant_check();
 
 create index idx_thread_deal_confirmations_user on public.thread_deal_confirmations (user_id);
 

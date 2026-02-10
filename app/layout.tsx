@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 
 import { LayoutShell } from "@/components/layout/layout-shell";
+import { getUser } from "@/lib/auth";
 
 import "./globals.css";
 
@@ -17,18 +18,23 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   title: "Rootie",
-  description: "Rootie app skeleton",
+  description: "Rastliny na dosah vo vašom kraji",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const user = await getUser();
+  const isAuthenticated = !!user;
+
   return (
-    <html lang="en">
+    <html lang="sk">
       <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
-        <LayoutShell>{children}</LayoutShell>
+        <LayoutShell isAuthenticated={isAuthenticated}>
+          {children}
+        </LayoutShell>
       </body>
     </html>
   );

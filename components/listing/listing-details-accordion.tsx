@@ -1,6 +1,7 @@
 "use client";
 
 import { MapPin, Ruler, Leaf, Tag, FileText } from "lucide-react";
+import { getConditionLabel, getSizeLabel } from "@/lib/listing-labels";
 import { getRegionShortLabel } from "@/lib/regions";
 import { cn } from "@/lib/utils";
 
@@ -71,10 +72,10 @@ export function ListingDetailsAccordion({
       </summary>
       <div className="border-t px-4">
         {condition && (
-          <DetailRow icon={Tag} label="Stav" value={condition} />
+          <DetailRow icon={Tag} label="Stav" value={getConditionLabel(condition)} />
         )}
         {size && (
-          <DetailRow icon={Ruler} label="Veľkosť" value={size} />
+          <DetailRow icon={Ruler} label="Veľkosť" value={getSizeLabel(size)} />
         )}
         {leafCount != null && (
           <DetailRow

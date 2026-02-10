@@ -1,7 +1,7 @@
 "use client";
 
 import { useTransition } from "react";
-import { Bookmark } from "lucide-react";
+import { Heart } from "lucide-react";
 
 import { toggleSave } from "@/lib/actions/reactions-saves";
 import { Button } from "@/components/ui/button";
@@ -49,7 +49,7 @@ export function SaveListingButton({
       aria-pressed={isSaved}
       title={!isAuthenticated ? "Prihláste sa" : label}
     >
-      <Bookmark
+      <Heart
         className={cn("size-4", isSaved && "fill-current")}
         aria-hidden
       />

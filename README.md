@@ -22,6 +22,8 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 ## Database (Supabase)
 
+**Napojenie na Supabase Cloud (online):** postup je v [docs/supabase-cloud.md](docs/supabase-cloud.md) — vytvorenie projektu, API kľúče do `.env.local`, aplikovanie migrácií.
+
 Phase 1.0 schema, RLS, and seed live in `db/`. Apply them in order (e.g. in Supabase SQL Editor or via Docker/init scripts):
 
 1. **Schema** — `db/schema.sql` (tables, indexes, triggers: deal confirmations, review ratings).

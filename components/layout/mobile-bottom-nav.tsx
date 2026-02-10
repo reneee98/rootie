@@ -3,7 +3,14 @@
 import type { ComponentType } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { CirclePlus, House, Inbox, Search, UserRound } from "lucide-react";
+import {
+  CirclePlus,
+  House,
+  Inbox,
+  LogIn,
+  Search,
+  UserRound,
+} from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -11,15 +18,19 @@ type NavItem = {
   href: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
+  /** If true, only show for authenticated users */
+  authOnly?: boolean;
+  /** If true, only show for guests */
+  guestOnly?: boolean;
 };
 
-/** 5-tab mobile nav: Domov, Hľadám, Pridať, Inbox, Profil. 44px min tap, safe area. */
 const navItems: NavItem[] = [
   { href: "/", label: "Domov", icon: House },
   { href: "/wanted", label: "Hľadám", icon: Search },
-  { href: "/create", label: "Pridať", icon: CirclePlus },
-  { href: "/inbox", label: "Inbox", icon: Inbox },
-  { href: "/me", label: "Profil", icon: UserRound },
+  { href: "/create", label: "Pridať", icon: CirclePlus, authOnly: true },
+  { href: "/inbox", label: "Inbox", icon: Inbox, authOnly: true },
+  { href: "/me", label: "Profil", icon: UserRound, authOnly: true },
+  { href: "/login", label: "Prihlásiť", icon: LogIn, guestOnly: true },
 ];
 
 function isRouteActive(pathname: string, href: string) {
@@ -30,19 +41,34 @@ function isRouteActive(pathname: string, href: string) {
   return pathname === href || pathname.startsWith(`${href}/`);
 }
 
-export function MobileBottomNav() {
+type MobileBottomNavProps = {
+  isAuthenticated?: boolean;
+};
+
+export function MobileBottomNav({
+  isAuthenticated = false,
+}: MobileBottomNavProps) {
   const pathname = usePathname();
 
   /* Hide nav during create wizards for full-screen UX */
   if (pathname === "/create" || pathname === "/wanted/create") return null;
+
+  const visibleItems = navItems.filter((item) => {
+    if (item.authOnly && !isAuthenticated) return false;
+    if (item.guestOnly && isAuthenticated) return false;
+    return true;
+  });
 
   return (
     <nav
       aria-label="Primary"
       className="bg-background/95 supports-[backdrop-filter]:bg-background/85 fixed right-0 bottom-0 left-0 z-50 border-t backdrop-blur"
     >
-      <ul className="mx-auto grid max-w-md grid-cols-5 gap-0 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
-        {navItems.map((item) => {
+      <ul
+        className="mx-auto grid max-w-md gap-0 px-2 pt-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))]"
+        style={{ gridTemplateColumns: `repeat(${visibleItems.length}, 1fr)` }}
+      >
+        {visibleItems.map((item) => {
           const Icon = item.icon;
           const active = isRouteActive(pathname, item.href);
 

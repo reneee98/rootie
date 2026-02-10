@@ -60,4 +60,6 @@
 
 **2026-02-09 — Accepted — Najčastejšie hľadané kategórie namiesto Aukcie/Pevná cena v chipoch** — Na home feede sú filter chipy „Aukcie“ a „Pevná cena“ nahradené quick-search kategóriami rastlín: Monstera, Philodendron, Hoya, Pilea, Sukulenty, Orchidey. Klik na chip nastaví vyhľadávací dotaz (q). Každá kategória má ikonu (Leaf, LeafyGreen, Flower2, Sprout, Flower) a text. Filtre Výmena, Príslušenstvo, Overení ostávajú v druhom riadku chipov. Typ inzerátu (fixed/auction) sa dá zmeniť cez sort alebo budúci filter ak bude potreba.
 
+**2026-02-10 — Accepted — Uložené = srdce v celej aplikácii** — Všade (header, tlačidlo uložiť, stránka Uložené inzeráty) sa „uložené“ zobrazuje ako ikona srdca namiesto záložky — Konzistentná vizuálna značka; srdce je zrozumiteľnejšie pre „obľúbené/uložené“.
+
 **2026-02-09 — Accepted — Admin účet a rola s iným zobrazením** — Jeden (alebo viac) účet má rolu administrátora (`profiles.is_moderator = true`). Administrátor má úplne iné zobrazenie: cesty pod `/admin` nepoužívajú hlavný app shell (žiadny feed header, žiadna spodná navigácia). Admin má vlastný layout (AdminShell): header „Administrácia“, odkaz „Späť do aplikácie“ na `/`, navigácia „Nahlásenia“ na `/admin/reports`. Vstup do adminu: z účtu `/me` tlačidlo „Moderácia – nahlásenia“ (viditeľné len pre is_moderator).

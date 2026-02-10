@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { MessageCircle, Bookmark, ArrowLeftRight } from "lucide-react";
+import { MessageCircle, ArrowLeftRight } from "lucide-react";
 
 import { getOrCreateListingThreadFormAction } from "@/lib/actions/listing-thread";
 import { SaveListingButton } from "@/components/listing/save-listing-button";

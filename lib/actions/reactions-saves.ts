@@ -63,7 +63,7 @@ export async function saveReaction(
 export type ToggleSaveResult = { ok: true; is_saved: boolean } | { ok: false; error: string };
 
 /**
- * Toggle save (bookmark) for the current user on a listing.
+ * Toggle save (heart) for the current user on a listing.
  */
 export async function toggleSave(listingId: string): Promise<ToggleSaveResult> {
   const user = await getUser();

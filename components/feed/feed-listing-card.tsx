@@ -18,11 +18,26 @@ type FeedListingCardProps = {
   isAuthenticated?: boolean;
 };
 
+/** Iniciála pre avatar: prvé písmeno mena predajcu, inak prvé písmeno názvu rastliny. */
+function getSellerInitial(displayName: string | null | undefined, plantName: string): string {
+  const name = (displayName ?? "").trim();
+  if (name.length > 0) return name.charAt(0).toUpperCase();
+  return plantName.charAt(0).toUpperCase();
+}
+
+/** Prvé meno (prvý token) z display_name, alebo prázdny reťazec. */
+function getSellerFirstName(displayName: string | null | undefined): string {
+  const name = (displayName ?? "").trim();
+  const first = name.split(/\s+/)[0];
+  return first ?? "";
+}
+
 export function FeedListingCardComponent({
   listing,
   isAuthenticated = false,
 }: FeedListingCardProps) {
   const [imgLoaded, setImgLoaded] = useState(false);
+  const sellerFirstName = getSellerFirstName(listing.seller_display_name);
   const priceLabel =
     listing.type === "fixed" && listing.fixed_price != null
       ? formatPrice(listing.fixed_price)
@@ -39,8 +54,8 @@ export function FeedListingCardComponent({
       )}
       aria-label={`${listing.plant_name}, ${priceLabel || listing.type}`}
     >
-      {/* Photo */}
-      <div className="relative aspect-square w-full bg-muted">
+      {/* Photo — fixed 1:1 ratio; any upload is cropped to fill (orez na výšku/šírku) */}
+      <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-muted">
         {listing.first_photo_url ? (
           <>
             {!imgLoaded && (
@@ -53,7 +68,7 @@ export function FeedListingCardComponent({
               src={listing.first_photo_url}
               alt=""
               className={cn(
-                "size-full object-cover transition-opacity duration-200",
+                "absolute inset-0 size-full object-cover object-center transition-opacity duration-200",
                 imgLoaded ? "opacity-100" : "opacity-0"
               )}
               loading="lazy"
@@ -108,8 +123,9 @@ export function FeedListingCardComponent({
       </div>
 
       {/* Info */}
-      <div className="flex flex-1 flex-col gap-1 p-2">
-        <span className="line-clamp-2 text-sm font-medium leading-tight">
+      <div className="flex flex-col gap-1 p-2">
+        {/* Title — always reserves 2 lines (text-sm leading-tight ≈ 35px) for alignment */}
+        <span className="line-clamp-2 min-h-[35px] text-sm font-medium leading-tight">
           {listing.plant_name}
         </span>
         <div className="flex items-baseline justify-between gap-1">
@@ -125,24 +141,29 @@ export function FeedListingCardComponent({
         {listing.type === "auction" && listing.auction_ends_at && (
           <AuctionCountdown endsAt={listing.auction_ends_at} />
         )}
-        {/* Seller mini: avatar + rating + verified */}
-        <div className="flex min-h-[44px] items-center gap-1.5 pt-0.5">
+        {/* Seller mini — inicialky z mena, prvé meno */}
+        <div className="flex items-center gap-1.5 pt-0.5">
           <Avatar className="size-6 shrink-0">
             {listing.seller_avatar_url ? (
               <AvatarImage src={listing.seller_avatar_url} alt="" />
             ) : null}
-            <AvatarFallback className="text-[10px]">
-              {listing.plant_name.charAt(0).toUpperCase()}
+            <AvatarFallback className="text-[10px] font-medium">
+              {getSellerInitial(listing.seller_display_name, listing.plant_name)}
             </AvatarFallback>
           </Avatar>
+          {sellerFirstName ? (
+            <span className="text-muted-foreground min-w-0 truncate text-[11px] font-medium">
+              {sellerFirstName}
+            </span>
+          ) : null}
           {listing.seller_ratings_avg != null && (
-            <span className="text-muted-foreground text-[10px]">
+            <span className="text-muted-foreground shrink-0 text-[10px]">
               {Number(listing.seller_ratings_avg).toFixed(1)}
             </span>
           )}
           {listing.seller_phone_verified && (
             <Phone
-              className="text-muted-foreground size-3.5 shrink-0"
+              className="text-muted-foreground size-3 shrink-0"
               aria-label="Overený predajca"
             />
           )}

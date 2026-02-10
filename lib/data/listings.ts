@@ -18,6 +18,8 @@ export type FeedListingCard = {
   seller_phone_verified: boolean;
   seller_avatar_url: string | null;
   seller_ratings_avg: number | null;
+  /** Predajcovo zobrazené meno (pre mini-badge a inicialky) */
+  seller_display_name: string | null;
   is_saved?: boolean;
 };
 
@@ -118,7 +120,7 @@ export async function getListingsFeed(
       .from("listings")
       .select(
         `id, plant_name, type, swap_enabled, category, fixed_price, auction_start_price, auction_ends_at, region,
-         seller:profiles!listings_seller_id_fkey ( phone_verified, avatar_url, ratings_avg )`
+         seller:profiles!listings_seller_id_fkey ( display_name, phone_verified, avatar_url, ratings_avg )`
       )
       .eq("status", "active")
       .in("id", ids);
@@ -149,7 +151,7 @@ export async function getListingsFeed(
     .from("listings")
     .select(
       `id, plant_name, type, swap_enabled, category, fixed_price, auction_start_price, auction_ends_at, region,
-       seller:profiles!listings_seller_id_fkey ( phone_verified, avatar_url, ratings_avg )`
+       seller:profiles!listings_seller_id_fkey ( display_name, phone_verified, avatar_url, ratings_avg )`
     )
     .eq("status", "active");
 
@@ -261,6 +263,7 @@ export async function getListingsFeed(
       seller_avatar_url: (seller?.avatar_url as string) ?? null,
       seller_ratings_avg:
         seller?.ratings_avg != null ? Number(seller.ratings_avg) : null,
+      seller_display_name: (seller?.display_name as string) ?? null,
       is_saved: userId ? savedSet.has(l.id as string) : undefined,
     };
   });
@@ -455,7 +458,7 @@ export async function getSavedListings(
     .from("listings")
     .select(
       `id, plant_name, type, swap_enabled, category, fixed_price, auction_start_price, auction_ends_at, region,
-       seller:profiles!listings_seller_id_fkey ( phone_verified, avatar_url, ratings_avg )`
+       seller:profiles!listings_seller_id_fkey ( display_name, phone_verified, avatar_url, ratings_avg )`
     )
     .eq("status", "active")
     .in("id", listingIds);
@@ -498,6 +501,7 @@ export async function getSavedListings(
       seller_avatar_url: (seller?.avatar_url as string) ?? null,
       seller_ratings_avg:
         seller?.ratings_avg != null ? Number(seller.ratings_avg) : null,
+      seller_display_name: (seller?.display_name as string) ?? null,
       is_saved: true,
     };
   });

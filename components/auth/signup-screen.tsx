@@ -80,7 +80,7 @@ export function SignupScreen({ nextPath }: SignupScreenProps) {
       <div className="flex flex-1 flex-col">
         <div className="flex min-h-[44px] items-center">
           <Button variant="ghost" size="icon" asChild aria-label="Späť">
-            <Link href="/welcome">
+            <Link href="/" aria-label="Späť na domov">
               <ArrowLeft className="size-5" />
             </Link>
           </Button>
