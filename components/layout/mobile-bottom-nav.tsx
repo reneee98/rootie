@@ -1,6 +1,7 @@
 "use client";
 
 import type { ComponentType } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
@@ -12,6 +13,7 @@ import {
   UserRound,
 } from "lucide-react";
 
+import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { cn } from "@/lib/utils";
 
 type NavItem = {
@@ -49,15 +51,76 @@ export function MobileBottomNav({
   isAuthenticated = false,
 }: MobileBottomNavProps) {
   const pathname = usePathname();
+  const [hasUnreadInbox, setHasUnreadInbox] = useState(false);
+  const hideNav = pathname === "/create" || pathname === "/wanted/create";
 
-  /* Hide nav during create wizards for full-screen UX */
-  if (pathname === "/create" || pathname === "/wanted/create") return null;
+  const refreshUnreadStatus = useCallback(async () => {
+    if (!isAuthenticated) {
+      setHasUnreadInbox(false);
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/inbox/unread", {
+        cache: "no-store",
+      });
+      if (!response.ok) {
+        setHasUnreadInbox(false);
+        return;
+      }
+
+      const data = (await response.json()) as { hasUnread?: boolean };
+      setHasUnreadInbox(Boolean(data.hasUnread));
+    } catch {
+      // Keep previous state if request fails.
+    }
+  }, [isAuthenticated]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void refreshUnreadStatus();
+    }, 0);
+
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [refreshUnreadStatus, pathname]);
+
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const supabase = createSupabaseBrowserClient();
+    const channel = supabase
+      .channel("bottom-nav-inbox-unread")
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+        },
+        () => {
+          void refreshUnreadStatus();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      const channelToRemove = channel;
+      setTimeout(() => {
+        supabase.removeChannel(channelToRemove);
+      }, 0);
+    };
+  }, [isAuthenticated, refreshUnreadStatus]);
 
   const visibleItems = navItems.filter((item) => {
     if (item.authOnly && !isAuthenticated) return false;
     if (item.guestOnly && isAuthenticated) return false;
     return true;
   });
+
+  /* Hide nav during create wizards for full-screen UX */
+  if (hideNav) return null;
 
   return (
     <nav
@@ -71,6 +134,7 @@ export function MobileBottomNav({
         {visibleItems.map((item) => {
           const Icon = item.icon;
           const active = isRouteActive(pathname, item.href);
+          const showInboxUnreadDot = item.href === "/inbox" && hasUnreadInbox;
 
           return (
             <li key={item.href}>
@@ -82,7 +146,18 @@ export function MobileBottomNav({
                 )}
                 aria-current={active ? "page" : undefined}
               >
-                <Icon className="size-5 shrink-0" aria-hidden />
+                <span className="relative inline-flex">
+                  <Icon className="size-5 shrink-0" aria-hidden />
+                  {showInboxUnreadDot ? (
+                    <>
+                      <span
+                        className="absolute -top-0.5 -right-1.5 inline-flex size-2 rounded-full bg-red-500 ring-2 ring-background"
+                        aria-hidden
+                      />
+                      <span className="sr-only">Máte nové správy</span>
+                    </>
+                  ) : null}
+                </span>
                 <span>{item.label}</span>
               </Link>
             </li>

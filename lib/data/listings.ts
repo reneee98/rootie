@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
+import { PUBLIC_LISTING_STATUS } from "@/lib/listing-lifecycle";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -7,6 +8,7 @@ import { createSupabaseServerClient } from "@/lib/supabaseClient";
 export type FeedListingCard = {
   id: string;
   plant_name: string;
+  created_at: string;
   type: "fixed" | "auction";
   swap_enabled: boolean;
   category: "plant" | "accessory";
@@ -18,8 +20,12 @@ export type FeedListingCard = {
   seller_phone_verified: boolean;
   seller_avatar_url: string | null;
   seller_ratings_avg: number | null;
+  seller_ratings_count: number;
   /** Predajcovo zobrazené meno (pre mini-badge a inicialky) */
   seller_display_name: string | null;
+  bid_count: number;
+  current_bid: number | null;
+  photo_count: number;
   is_saved?: boolean;
 };
 
@@ -72,16 +78,38 @@ export type FeedFilters = {
   type?: "fixed" | "auction";
   swap_enabled?: boolean;
   category?: "plant" | "accessory";
+  district?: string;
+  condition?: string;
+  size?: "S" | "M" | "L";
+  min_photos?: number;
   price_min?: number;
   price_max?: number;
+  auction_ends_within_hours?: number;
+  auction_min_bid?: number;
   query?: string;
-  sort?: "newest" | "ending_soon" | "trending";
+  sort?:
+    | "newest"
+    | "ending_soon"
+    | "trending"
+    | "price_asc"
+    | "price_desc"
+    | "auction_newest";
   page?: number;
   /** When true, only listings from sellers with phone_verified */
   verified_seller?: boolean;
 };
 
 const PAGE_SIZE = 20;
+
+type FilterableListingsQuery<T> = {
+  eq: (column: string, value: unknown) => T;
+  in: (column: string, values: unknown[]) => T;
+  or: (filters: string) => T;
+  ilike: (column: string, pattern: string) => T;
+  gt: (column: string, value: string) => T;
+  lte: (column: string, value: string) => T;
+  gte: (column: string, value: number) => T;
+};
 
 // ---------------------------------------------------------------------------
 // Feed query
@@ -97,7 +125,82 @@ export async function getListingsFeed(
   const to = from + PAGE_SIZE - 1;
   const sort = filters.sort ?? "newest";
 
-  let listingRows: Record<string, unknown>[];
+  let verifiedSellerIds: string[] | null = null;
+  if (filters.verified_seller === true) {
+    const { data: verifiedIds } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("phone_verified", true);
+    verifiedSellerIds = (verifiedIds ?? []).map((row) => row.id);
+    if (verifiedSellerIds.length === 0) {
+      return { listings: [], hasMore: false };
+    }
+  }
+
+  const listingSelect =
+    "id, plant_name, created_at, type, swap_enabled, category, fixed_price, auction_start_price, auction_ends_at, region, condition, size, district, auction_min_increment, seller:profiles!listings_seller_id_fkey ( display_name, phone_verified, avatar_url, ratings_avg, ratings_count )";
+
+  const applyCommonFilters = <T extends FilterableListingsQuery<T>>(
+    query: T,
+    opts?: { skipRegion?: boolean }
+  ) => {
+    let q = query;
+
+    if (!opts?.skipRegion && filters.region && filters.region !== "All Slovakia") {
+      q = q.eq("region", filters.region);
+    }
+    if (filters.district?.trim()) {
+      q = q.eq("district", filters.district.trim());
+    }
+    if (filters.type) {
+      q = q.eq("type", filters.type);
+    }
+    if (filters.swap_enabled === true) {
+      q = q.eq("swap_enabled", true);
+    }
+    if (filters.category) {
+      q = q.eq("category", filters.category);
+    }
+    if (verifiedSellerIds && verifiedSellerIds.length > 0) {
+      q = q.in("seller_id", verifiedSellerIds);
+    }
+    if (filters.price_min != null) {
+      q = q.or(
+        `fixed_price.gte.${filters.price_min},auction_start_price.gte.${filters.price_min}`
+      );
+    }
+    if (filters.price_max != null) {
+      q = q.or(
+        `fixed_price.lte.${filters.price_max},auction_start_price.lte.${filters.price_max}`
+      );
+    }
+    if (filters.query?.trim()) {
+      q = q.ilike("plant_name", `%${filters.query.trim()}%`);
+    }
+    if (filters.condition?.trim()) {
+      q = q.ilike("condition", `%${filters.condition.trim()}%`);
+    }
+    if (filters.size) {
+      q = q.eq("size", filters.size);
+    }
+    if (filters.auction_min_bid != null) {
+      q = q.eq("type", "auction").gte("auction_min_increment", filters.auction_min_bid);
+    }
+    if (filters.auction_ends_within_hours != null) {
+      const now = new Date();
+      const until = new Date(
+        now.getTime() + filters.auction_ends_within_hours * 3_600_000
+      );
+      q = q
+        .eq("type", "auction")
+        .gt("auction_ends_at", now.toISOString())
+        .lte("auction_ends_at", until.toISOString());
+    }
+
+    return q;
+  };
+
+  let listingRows: Record<string, unknown>[] = [];
 
   if (sort === "trending") {
     const region =
@@ -107,122 +210,63 @@ export async function getListingsFeed(
     let trendQ = supabase
       .from("listing_trending_scores")
       .select("listing_id")
-      .eq("status", "active")
+      .eq("status", PUBLIC_LISTING_STATUS)
       .order("trending_score", { ascending: false })
       .range(from, to);
-    if (region) trendQ = trendQ.eq("region", region);
+    if (region) {
+      trendQ = trendQ.eq("region", region);
+    }
     const { data: trendRows, error: trendErr } = await trendQ;
     if (trendErr || !trendRows?.length) {
       return { listings: [], hasMore: false };
     }
-    const ids = trendRows.map((r) => r.listing_id as string);
+
+    const orderedIds = trendRows.map((row) => row.listing_id as string);
     let listQ = supabase
       .from("listings")
-      .select(
-        `id, plant_name, type, swap_enabled, category, fixed_price, auction_start_price, auction_ends_at, region,
-         seller:profiles!listings_seller_id_fkey ( display_name, phone_verified, avatar_url, ratings_avg )`
-      )
-      .eq("status", "active")
-      .in("id", ids);
-    if (filters.type) listQ = listQ.eq("type", filters.type);
-    if (filters.swap_enabled === true) listQ = listQ.eq("swap_enabled", true);
-    if (filters.category) listQ = listQ.eq("category", filters.category);
-    if (filters.verified_seller === true) {
-      const { data: verifiedIds } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("phone_verified", true);
-      const idsList = (verifiedIds ?? []).map((r) => r.id);
-      if (idsList.length > 0) listQ = listQ.in("seller_id", idsList);
-      else return { listings: [], hasMore: false };
-    }
-    if (filters.query?.trim()) {
-      listQ = listQ.ilike("plant_name", `%${filters.query.trim()}%`);
-    }
-    const { data: listData, error: listErr } = await listQ;
-    if (listErr || !listData?.length) {
+      .select(listingSelect)
+      .eq("status", PUBLIC_LISTING_STATUS)
+      .in("id", orderedIds);
+
+    listQ = applyCommonFilters(listQ, { skipRegion: true });
+
+    const { data, error } = await listQ;
+    if (error || !data?.length) {
       return { listings: [], hasMore: false };
     }
-    listingRows = listData.sort(
-      (a, b) => ids.indexOf(a.id as string) - ids.indexOf(b.id as string)
-    ) as Record<string, unknown>[];
+
+    listingRows = (data as Record<string, unknown>[]).sort(
+      (a, b) =>
+        orderedIds.indexOf(a.id as string) - orderedIds.indexOf(b.id as string)
+    );
   } else {
     let q = supabase
-    .from("listings")
-    .select(
-      `id, plant_name, type, swap_enabled, category, fixed_price, auction_start_price, auction_ends_at, region,
-       seller:profiles!listings_seller_id_fkey ( display_name, phone_verified, avatar_url, ratings_avg )`
-    )
-    .eq("status", "active");
+      .from("listings")
+      .select(listingSelect)
+      .eq("status", PUBLIC_LISTING_STATUS);
+    q = applyCommonFilters(q);
 
-  // Verified seller filter (fetch profile ids first)
-  if (filters.verified_seller === true) {
-    const { data: verifiedIds } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("phone_verified", true);
-    const idsList = (verifiedIds ?? []).map((r) => r.id);
-    if (idsList.length > 0) q = q.in("seller_id", idsList);
-    else return { listings: [], hasMore: false };
+    if (sort === "ending_soon") {
+      q = q
+        .eq("type", "auction")
+        .gt("auction_ends_at", new Date().toISOString())
+        .order("auction_ends_at", { ascending: true });
+    } else if (sort === "auction_newest") {
+      q = q.eq("type", "auction").order("created_at", { ascending: false });
+    } else {
+      q = q.order("created_at", { ascending: false });
+    }
+
+    q = q.range(from, to);
+    const { data, error } = await q;
+    if (error || !data?.length) {
+      return { listings: [], hasMore: false };
+    }
+    listingRows = data as Record<string, unknown>[];
   }
 
-  // Region filter
-  if (filters.region && filters.region !== "All Slovakia") {
-    q = q.eq("region", filters.region);
-  }
-
-  // Type filter
-  if (filters.type) {
-    q = q.eq("type", filters.type);
-  }
-
-  // Swap filter
-  if (filters.swap_enabled === true) {
-    q = q.eq("swap_enabled", true);
-  }
-
-  // Category filter
-  if (filters.category) {
-    q = q.eq("category", filters.category);
-  }
-
-  // Price range (uses fixed_price for fixed, auction_start_price for auction)
-  if (filters.price_min != null) {
-    q = q.or(
-      `fixed_price.gte.${filters.price_min},auction_start_price.gte.${filters.price_min}`
-    );
-  }
-  if (filters.price_max != null) {
-    q = q.or(
-      `fixed_price.lte.${filters.price_max},auction_start_price.lte.${filters.price_max}`
-    );
-  }
-
-  // Search query (ilike on plant_name)
-  if (filters.query?.trim()) {
-    q = q.ilike("plant_name", `%${filters.query.trim()}%`);
-  }
-
-  if (sort === "ending_soon") {
-    q = q
-      .eq("type", "auction")
-      .gt("auction_ends_at", new Date().toISOString())
-      .order("auction_ends_at", { ascending: true });
-  } else {
-    q = q.order("created_at", { ascending: false });
-  }
-
-  q = q.range(from, to);
-  const { data, error } = await q;
-  if (error || !data?.length) {
-    return { listings: [], hasMore: false };
-  }
-  listingRows = data as Record<string, unknown>[];
-  }
-
-  const listingIds = listingRows.map((l) => l.id as string);
-
-  const [photosRes, savedRes] = await Promise.all([
+  const listingIds = listingRows.map((row) => row.id as string);
+  const [photosRes, savedRes, bidsRes] = await Promise.all([
     supabase
       .from("listing_photos")
       .select("listing_id, url")
@@ -235,41 +279,96 @@ export async function getListingsFeed(
           .eq("user_id", userId)
           .in("listing_id", listingIds)
       : Promise.resolve({ data: [] }),
+    supabase
+      .from("bids")
+      .select("listing_id, amount")
+      .in("listing_id", listingIds)
+      .order("amount", { ascending: false }),
   ]);
 
   const firstPhoto = new Map<string, string>();
-  for (const p of photosRes.data ?? []) {
-    if (!firstPhoto.has(p.listing_id)) firstPhoto.set(p.listing_id, p.url);
+  const photoCount = new Map<string, number>();
+  for (const row of photosRes.data ?? []) {
+    const listingId = row.listing_id as string;
+    photoCount.set(listingId, (photoCount.get(listingId) ?? 0) + 1);
+    if (!firstPhoto.has(listingId)) {
+      firstPhoto.set(listingId, row.url);
+    }
   }
+
+  const bidStats = new Map<string, { bidCount: number; currentBid: number | null }>();
+  for (const row of bidsRes.data ?? []) {
+    const listingId = row.listing_id as string;
+    const amount = row.amount != null ? Number(row.amount) : null;
+    const current = bidStats.get(listingId);
+    if (!current) {
+      bidStats.set(listingId, {
+        bidCount: 1,
+        currentBid: amount,
+      });
+      continue;
+    }
+    current.bidCount += 1;
+    if (amount != null && (current.currentBid == null || amount > current.currentBid)) {
+      current.currentBid = amount;
+    }
+  }
+
   const savedSet = new Set(
-    (savedRes.data ?? []).map((s) => s.listing_id as string)
+    (savedRes.data ?? []).map((row) => row.listing_id as string)
   );
 
-  const mapped: FeedListingCard[] = listingRows.map((l) => {
-    const seller = l.seller as Record<string, unknown> | null;
+  const mapped: FeedListingCard[] = listingRows.map((row) => {
+    const seller = row.seller as Record<string, unknown> | null;
+    const listingId = row.id as string;
+    const stats = bidStats.get(listingId);
     return {
-      id: l.id as string,
-      plant_name: l.plant_name as string,
-      type: l.type as "fixed" | "auction",
-      swap_enabled: Boolean(l.swap_enabled),
-      category: l.category as "plant" | "accessory",
-      fixed_price: l.fixed_price != null ? Number(l.fixed_price) : null,
+      id: listingId,
+      plant_name: row.plant_name as string,
+      created_at: row.created_at as string,
+      type: row.type as "fixed" | "auction",
+      swap_enabled: Boolean(row.swap_enabled),
+      category: row.category as "plant" | "accessory",
+      fixed_price: row.fixed_price != null ? Number(row.fixed_price) : null,
       auction_start_price:
-        l.auction_start_price != null ? Number(l.auction_start_price) : null,
-      auction_ends_at: (l.auction_ends_at as string) ?? null,
-      region: l.region as string,
-      first_photo_url: firstPhoto.get(l.id as string) ?? null,
+        row.auction_start_price != null ? Number(row.auction_start_price) : null,
+      auction_ends_at: (row.auction_ends_at as string) ?? null,
+      region: row.region as string,
+      first_photo_url: firstPhoto.get(listingId) ?? null,
       seller_phone_verified: Boolean(seller?.phone_verified),
       seller_avatar_url: (seller?.avatar_url as string) ?? null,
       seller_ratings_avg:
         seller?.ratings_avg != null ? Number(seller.ratings_avg) : null,
+      seller_ratings_count:
+        seller?.ratings_count != null ? Number(seller.ratings_count) : 0,
       seller_display_name: (seller?.display_name as string) ?? null,
-      is_saved: userId ? savedSet.has(l.id as string) : undefined,
+      bid_count: stats?.bidCount ?? 0,
+      current_bid: stats?.currentBid ?? null,
+      photo_count: photoCount.get(listingId) ?? 0,
+      is_saved: userId ? savedSet.has(listingId) : undefined,
     };
   });
 
+  const maybePriceSorted =
+    sort === "price_asc" || sort === "price_desc"
+      ? [...mapped].sort((a, b) => {
+          const priceA = a.type === "fixed" ? a.fixed_price : a.current_bid ?? a.auction_start_price;
+          const priceB = b.type === "fixed" ? b.fixed_price : b.current_bid ?? b.auction_start_price;
+          if (priceA == null && priceB == null) return 0;
+          if (priceA == null) return 1;
+          if (priceB == null) return -1;
+          return sort === "price_asc" ? priceA - priceB : priceB - priceA;
+        })
+      : mapped;
+
+  const minPhotos = filters.min_photos ?? 0;
+  const filteredByPhotoCount =
+    minPhotos > 0
+      ? maybePriceSorted.filter((listing) => listing.photo_count >= minPhotos)
+      : maybePriceSorted;
+
   return {
-    listings: mapped,
+    listings: filteredByPhotoCount,
     hasMore: listingRows.length === PAGE_SIZE,
   };
 }
@@ -443,7 +542,7 @@ export async function getSavedListings(
 ): Promise<FeedListingCard[]> {
   const supabase = await createSupabaseServerClient();
 
-  let q = supabase
+  const q = supabase
     .from("saved_listings")
     .select("listing_id")
     .eq("user_id", userId)
@@ -457,10 +556,10 @@ export async function getSavedListings(
   let listQ = supabase
     .from("listings")
     .select(
-      `id, plant_name, type, swap_enabled, category, fixed_price, auction_start_price, auction_ends_at, region,
-       seller:profiles!listings_seller_id_fkey ( display_name, phone_verified, avatar_url, ratings_avg )`
+      `id, plant_name, created_at, type, swap_enabled, category, fixed_price, auction_start_price, auction_ends_at, region,
+       seller:profiles!listings_seller_id_fkey ( display_name, phone_verified, avatar_url, ratings_avg, ratings_count )`
     )
-    .eq("status", "active")
+    .eq("status", PUBLIC_LISTING_STATUS)
     .in("id", listingIds);
   if (region && region !== "All Slovakia") listQ = listQ.eq("region", region);
 
@@ -472,22 +571,50 @@ export async function getSavedListings(
     (a, b) => (order.get(a.id as string) ?? 0) - (order.get(b.id as string) ?? 0)
   );
 
-  const { data: photos } = await supabase
-    .from("listing_photos")
-    .select("listing_id, url")
-    .in("listing_id", listingIds)
-    .order("position", { ascending: true });
+  const [{ data: photos }, { data: bids }] = await Promise.all([
+    supabase
+      .from("listing_photos")
+      .select("listing_id, url")
+      .in("listing_id", listingIds)
+      .order("position", { ascending: true }),
+    supabase
+      .from("bids")
+      .select("listing_id, amount")
+      .in("listing_id", listingIds)
+      .order("amount", { ascending: false }),
+  ]);
 
   const firstPhoto = new Map<string, string>();
+  const photoCount = new Map<string, number>();
   for (const p of photos ?? []) {
-    if (!firstPhoto.has(p.listing_id)) firstPhoto.set(p.listing_id, p.url);
+    const listingId = p.listing_id as string;
+    photoCount.set(listingId, (photoCount.get(listingId) ?? 0) + 1);
+    if (!firstPhoto.has(listingId)) firstPhoto.set(listingId, p.url);
+  }
+
+  const bidStats = new Map<string, { bidCount: number; currentBid: number | null }>();
+  for (const row of bids ?? []) {
+    const listingId = row.listing_id as string;
+    const amount = row.amount != null ? Number(row.amount) : null;
+    const current = bidStats.get(listingId);
+    if (!current) {
+      bidStats.set(listingId, { bidCount: 1, currentBid: amount });
+      continue;
+    }
+    current.bidCount += 1;
+    if (amount != null && (current.currentBid == null || amount > current.currentBid)) {
+      current.currentBid = amount;
+    }
   }
 
   return sorted.map((l) => {
     const seller = l.seller as Record<string, unknown> | null;
+    const listingId = l.id as string;
+    const stats = bidStats.get(listingId);
     return {
-      id: l.id as string,
+      id: listingId,
       plant_name: l.plant_name as string,
+      created_at: l.created_at as string,
       type: l.type as "fixed" | "auction",
       swap_enabled: Boolean(l.swap_enabled),
       category: l.category as "plant" | "accessory",
@@ -496,13 +623,40 @@ export async function getSavedListings(
         l.auction_start_price != null ? Number(l.auction_start_price) : null,
       auction_ends_at: (l.auction_ends_at as string) ?? null,
       region: l.region as string,
-      first_photo_url: firstPhoto.get(l.id as string) ?? null,
+      first_photo_url: firstPhoto.get(listingId) ?? null,
       seller_phone_verified: Boolean(seller?.phone_verified),
       seller_avatar_url: (seller?.avatar_url as string) ?? null,
       seller_ratings_avg:
         seller?.ratings_avg != null ? Number(seller.ratings_avg) : null,
+      seller_ratings_count:
+        seller?.ratings_count != null ? Number(seller.ratings_count) : 0,
       seller_display_name: (seller?.display_name as string) ?? null,
+      bid_count: stats?.bidCount ?? 0,
+      current_bid: stats?.currentBid ?? null,
+      photo_count: photoCount.get(listingId) ?? 0,
       is_saved: true,
     };
   });
+}
+
+export async function getSavedListingsCount(userId: string): Promise<number> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data: savedRows, error: savedErr } = await supabase
+    .from("saved_listings")
+    .select("listing_id")
+    .eq("user_id", userId);
+
+  if (savedErr || !savedRows?.length) return 0;
+
+  const listingIds = savedRows.map((row) => row.listing_id as string);
+
+  const { count, error: countErr } = await supabase
+    .from("listings")
+    .select("id", { count: "exact", head: true })
+    .eq("status", PUBLIC_LISTING_STATUS)
+    .in("id", listingIds);
+
+  if (countErr) return 0;
+  return count ?? 0;
 }

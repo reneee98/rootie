@@ -5,9 +5,10 @@ import { Clock } from "lucide-react";
 
 type AuctionCountdownProps = {
   endsAt: string;
+  withPrefix?: boolean;
 };
 
-export function AuctionCountdown({ endsAt }: AuctionCountdownProps) {
+export function AuctionCountdown({ endsAt, withPrefix = false }: AuctionCountdownProps) {
   const [label, setLabel] = useState("");
 
   useEffect(() => {
@@ -42,7 +43,7 @@ export function AuctionCountdown({ endsAt }: AuctionCountdownProps) {
   return (
     <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
       <Clock className="size-2.5" aria-hidden />
-      {label}
+      {withPrefix ? `Končí za ${label}` : label}
     </span>
   );
 }

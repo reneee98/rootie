@@ -13,21 +13,29 @@ export function FeedListingCardSkeleton({
   return (
     <div
       className={cn(
-        "flex flex-col overflow-hidden rounded-lg border bg-card",
+        "flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm",
         className
       )}
       aria-hidden
     >
-      <Skeleton className="aspect-square w-full rounded-none" />
-      <div className="flex flex-col gap-1 p-2">
-        <Skeleton className="min-h-[35px] w-3/4" />
-        <div className="flex items-center justify-between gap-1">
-          <Skeleton className="h-4 w-12" />
-          <Skeleton className="h-3 w-16" />
-        </div>
-        <div className="flex items-center gap-1.5 pt-0.5">
-          <Skeleton className="size-5 shrink-0 rounded-full" />
-          <Skeleton className="h-3 w-6" />
+      <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
+        <Skeleton className="size-full rounded-none" />
+        <Skeleton className="absolute top-2 left-2 h-5 w-16 rounded-full" />
+        <Skeleton className="absolute top-2 left-20 h-5 w-14 rounded-full" />
+        <Skeleton className="absolute right-1.5 bottom-1.5 size-11 rounded-full" />
+      </div>
+      <div className="flex flex-col gap-2 p-3">
+        <Skeleton className="h-4 w-11/12" />
+        <Skeleton className="h-4 w-2/3" />
+        <Skeleton className="h-4 w-1/2" />
+        <Skeleton className="h-3 w-24" />
+        <div className="flex items-center gap-2 border-t pt-2">
+          <Skeleton className="size-7 shrink-0 rounded-full" />
+          <div className="space-y-1">
+            <Skeleton className="h-3 w-14" />
+            <Skeleton className="h-3 w-20" />
+          </div>
+          <Skeleton className="ml-auto h-6 w-20 rounded-full" />
         </div>
       </div>
     </div>

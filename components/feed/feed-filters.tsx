@@ -1,203 +1,870 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useTransition, useState } from "react";
-import { Search, ChevronDown } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useTransition,
+} from "react";
+import {
+  ChevronDown,
+  Filter,
+  MapPin,
+  Search,
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 
-import { ROOTIE_REGIONS, getRegionShortLabel } from "@/lib/regions";
-import { PLANT_QUICK_CATEGORIES } from "@/lib/plant-quick-categories";
+import { SLOVAK_REGIONS, getRegionShortLabel } from "@/lib/regions";
+import { Button } from "@/components/ui/button";
+import { FilterChip } from "@/components/ui/filter-chip";
 import {
   Drawer,
   DrawerContent,
+  DrawerFooter,
   DrawerHeader,
   DrawerTitle,
-  DrawerTrigger,
 } from "@/components/ui/drawer";
-import { FilterChip } from "@/components/ui/filter-chip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { cn } from "@/lib/utils";
 
-const SORT_OPTIONS = [
+type HomeFeedType = "all" | "fixed" | "auction";
+type HomeSort =
+  | "newest"
+  | "price_asc"
+  | "price_desc"
+  | "trending"
+  | "ending_soon"
+  | "auction_newest";
+
+type FeedFiltersProps = {
+  resultsCount?: number;
+};
+
+const STORED_FILTERS_KEY = "rootie:domov-filtre:v1";
+
+const TYPE_OPTIONS: { value: HomeFeedType; label: string }[] = [
+  { value: "all", label: "Všetko" },
+  { value: "fixed", label: "Pevná cena" },
+  { value: "auction", label: "Aukcie" },
+];
+
+const SORT_OPTIONS_DEFAULT: { value: HomeSort; label: string }[] = [
   { value: "newest", label: "Najnovšie" },
-  { value: "ending_soon", label: "Končí čoskoro" },
+  { value: "price_asc", label: "Najlacnejšie" },
+  { value: "price_desc", label: "Najdrahšie" },
   { value: "trending", label: "Trending" },
+];
+
+const SORT_OPTIONS_AUCTION: { value: HomeSort; label: string }[] = [
+  { value: "ending_soon", label: "Končí čoskoro" },
+  { value: "auction_newest", label: "Najnovšie aukcie" },
+];
+
+const AUCTION_ENDS_OPTIONS = [
+  { value: "1", label: "1h" },
+  { value: "6", label: "6h" },
+  { value: "24", label: "24h" },
+  { value: "168", label: "7 dní" },
 ] as const;
 
-export function FeedFilters() {
+const CONDITION_OPTIONS = ["Nová", "Pekný stav", "Potrebuje starostlivosť"] as const;
+const SIZE_OPTIONS = ["S", "M", "L"] as const;
+
+function parseType(value: string | null): HomeFeedType {
+  if (value === "fixed" || value === "auction") return value;
+  return "all";
+}
+
+function getDefaultSort(type: HomeFeedType): HomeSort {
+  return type === "auction" ? "ending_soon" : "newest";
+}
+
+function parseSort(value: string | null, type: HomeFeedType): HomeSort {
+  const allowed = type === "auction" ? SORT_OPTIONS_AUCTION : SORT_OPTIONS_DEFAULT;
+  if (value && allowed.some((option) => option.value === value)) {
+    return value as HomeSort;
+  }
+  return getDefaultSort(type);
+}
+
+function parsePositiveNumber(value: string | null): number | undefined {
+  if (!value) return undefined;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0) return undefined;
+  return parsed;
+}
+
+function formatSortLabel(sort: HomeSort): string {
+  const allOptions = [...SORT_OPTIONS_DEFAULT, ...SORT_OPTIONS_AUCTION];
+  return allOptions.find((option) => option.value === sort)?.label ?? "Najnovšie";
+}
+
+function getFiltersActiveCount(params: URLSearchParams, type: HomeFeedType, sort: HomeSort) {
+  const defaultsSort = getDefaultSort(type);
+  let count = 0;
+  if (params.get("region")) count += 1;
+  if (type !== "all") count += 1;
+  if (params.get("swap") === "1") count += 1;
+  if (params.get("verified") === "1") count += 1;
+  if (params.get("priceMin")) count += 1;
+  if (params.get("priceMax")) count += 1;
+  if (params.get("district")) count += 1;
+  if (params.get("category")) count += 1;
+  if (params.get("auctionEnds")) count += 1;
+  if (params.get("auctionMinBid")) count += 1;
+  if (params.get("minPhotos") === "3") count += 1;
+  if (params.get("condition")) count += 1;
+  if (params.get("size")) count += 1;
+  if (sort !== defaultsSort) count += 1;
+  return count;
+}
+
+export function FeedFilters({ resultsCount }: FeedFiltersProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
-  const [regionDrawerOpen, setRegionDrawerOpen] = useState(false);
 
-  const currentRegion = searchParams.get("region") || "All Slovakia";
-  const currentSort = searchParams.get("sort") || "newest";
-  const currentQuery = searchParams.get("q") || "";
+  const [filterOpen, setFilterOpen] = useState(false);
+  const [sortOpen, setSortOpen] = useState(false);
+  const [regionOpen, setRegionOpen] = useState(false);
+  const [typePickerOpen, setTypePickerOpen] = useState(false);
+
+  const restoreAttemptedRef = useRef(false);
+
+  const currentType = parseType(searchParams.get("type"));
+  const currentSort = parseSort(searchParams.get("sort"), currentType);
+  const currentQuery = (searchParams.get("q") ?? "").trim();
+  const currentRegion = searchParams.get("region") ?? "";
+  const currentSwap = searchParams.get("swap") === "1";
+  const currentVerified = searchParams.get("verified") === "1";
+
+  const currentCategory = searchParams.get("category") === "accessory" ? "accessory" : "plant";
+  const currentDistrict = searchParams.get("district") ?? "";
+  const currentPriceMin = searchParams.get("priceMin") ?? "";
+  const currentPriceMax = searchParams.get("priceMax") ?? "";
+  const currentAuctionEnds = searchParams.get("auctionEnds") ?? "";
+  const currentAuctionMinBid = searchParams.get("auctionMinBid") ?? "";
+  const currentMinPhotos = searchParams.get("minPhotos") === "3";
+  const currentCondition = searchParams.get("condition") ?? "";
+  const currentSize = searchParams.get("size") ?? "";
+
+  const [draftType, setDraftType] = useState<HomeFeedType>(currentType);
+  const [draftRegion, setDraftRegion] = useState(currentRegion);
+  const [draftDistrict, setDraftDistrict] = useState(currentDistrict);
+  const [draftCategory, setDraftCategory] = useState<"plant" | "accessory">(currentCategory);
+  const [draftSwap, setDraftSwap] = useState(currentSwap);
+  const [draftVerified, setDraftVerified] = useState(currentVerified);
+  const [draftPriceMin, setDraftPriceMin] = useState(currentPriceMin);
+  const [draftPriceMax, setDraftPriceMax] = useState(currentPriceMax);
+  const [draftSort, setDraftSort] = useState<HomeSort>(currentSort);
+  const [draftAuctionEnds, setDraftAuctionEnds] = useState(currentAuctionEnds);
+  const [draftAuctionMinBid, setDraftAuctionMinBid] = useState(currentAuctionMinBid);
+  const [draftMinPhotos, setDraftMinPhotos] = useState(currentMinPhotos);
+  const [draftCondition, setDraftCondition] = useState(currentCondition);
+  const [draftSize, setDraftSize] = useState(currentSize);
+
+  const activeFilterCount = useMemo(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    return getFiltersActiveCount(params, currentType, currentSort);
+  }, [currentSort, currentType, searchParams]);
 
   const updateParams = useCallback(
-    (updates: Record<string, string>) => {
+    (updates: Record<string, string>, options?: { replace?: boolean }) => {
       const params = new URLSearchParams(searchParams.toString());
       params.delete("page");
-      for (const [key, value] of Object.entries(updates)) {
-        if (value) {
-          params.set(key, value);
-        } else {
-          params.delete(key);
-        }
-      }
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+        else params.delete(key);
+      });
+
+      const qs = params.toString();
       startTransition(() => {
-        router.push(`/?${params.toString()}`, { scroll: false });
+        if (options?.replace) {
+          router.replace(qs ? `/?${qs}` : "/", { scroll: false });
+          return;
+        }
+        router.push(qs ? `/?${qs}` : "/", { scroll: false });
       });
     },
-    [router, searchParams, startTransition]
+    [router, searchParams]
   );
 
-  const handleSearchSubmit = useCallback(
-    (e: React.FormEvent<HTMLFormElement>) => {
-      e.preventDefault();
-      const fd = new FormData(e.currentTarget);
-      const q = (fd.get("q") as string)?.trim() || "";
-      updateParams({ q });
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+    window.localStorage.setItem(STORED_FILTERS_KEY, params.toString());
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (restoreAttemptedRef.current) return;
+    restoreAttemptedRef.current = true;
+
+    const currentParams = new URLSearchParams(searchParams.toString());
+    const hasAppliedParams = Array.from(currentParams.keys()).some(
+      (key) => key !== "page"
+    );
+    if (hasAppliedParams) return;
+
+    const stored = window.localStorage.getItem(STORED_FILTERS_KEY);
+    if (!stored) return;
+    const storedParams = new URLSearchParams(stored);
+    if (Array.from(storedParams.keys()).length === 0) return;
+
+    updateParams(Object.fromEntries(storedParams.entries()), { replace: true });
+  }, [searchParams, updateParams]);
+
+  const openFullSearch = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete("page");
+    const qs = params.toString();
+    router.push(qs ? `/search?${qs}` : "/search");
+  }, [router, searchParams]);
+
+  const clearSearch = useCallback(() => {
+    updateParams({ q: "" });
+  }, [updateParams]);
+
+  const setType = useCallback(
+    (nextType: HomeFeedType) => {
+      const nextSort = getDefaultSort(nextType);
+      updateParams({
+        type: nextType === "all" ? "" : nextType,
+        sort: nextSort === "newest" ? "" : nextSort,
+      });
+      setTypePickerOpen(false);
     },
     [updateParams]
   );
 
-  const isPlantCategorySelected = useCallback(
-    (searchQuery: string) => {
-      if (!currentQuery.trim()) return false;
-      return currentQuery.trim().toLowerCase() === searchQuery.toLowerCase();
-    },
-    [currentQuery]
-  );
+  const openFilters = useCallback(() => {
+    setDraftType(currentType);
+    setDraftRegion(currentRegion);
+    setDraftDistrict(currentDistrict);
+    setDraftCategory(currentCategory);
+    setDraftSwap(currentSwap);
+    setDraftVerified(currentVerified);
+    setDraftPriceMin(currentPriceMin);
+    setDraftPriceMax(currentPriceMax);
+    setDraftSort(currentSort);
+    setDraftAuctionEnds(currentAuctionEnds);
+    setDraftAuctionMinBid(currentAuctionMinBid);
+    setDraftMinPhotos(currentMinPhotos);
+    setDraftCondition(currentCondition);
+    setDraftSize(currentSize);
+    setFilterOpen(true);
+  }, [
+    currentAuctionEnds,
+    currentAuctionMinBid,
+    currentCategory,
+    currentCondition,
+    currentDistrict,
+    currentMinPhotos,
+    currentPriceMax,
+    currentPriceMin,
+    currentRegion,
+    currentSize,
+    currentSort,
+    currentSwap,
+    currentType,
+    currentVerified,
+  ]);
 
-  const handlePlantCategoryClick = useCallback(
-    (searchQuery: string) => {
-      const selected = isPlantCategorySelected(searchQuery);
-      updateParams({ q: selected ? "" : searchQuery });
-    },
-    [isPlantCategorySelected, updateParams]
-  );
-
-  const handleRegionSelect = useCallback(
+  const setRegion = useCallback(
     (region: string) => {
       updateParams({ region });
-      setRegionDrawerOpen(false);
+      setRegionOpen(false);
     },
     [updateParams]
   );
+
+  const setSort = useCallback(
+    (sort: HomeSort) => {
+      const defaultSort = getDefaultSort(currentType);
+      updateParams({ sort: sort === defaultSort ? "" : sort });
+      setSortOpen(false);
+    },
+    [currentType, updateParams]
+  );
+
+  const resetDraftFilters = useCallback(() => {
+    setDraftType("all");
+    setDraftRegion("");
+    setDraftDistrict("");
+    setDraftCategory("plant");
+    setDraftSwap(false);
+    setDraftVerified(false);
+    setDraftPriceMin("");
+    setDraftPriceMax("");
+    setDraftSort("newest");
+    setDraftAuctionEnds("");
+    setDraftAuctionMinBid("");
+    setDraftMinPhotos(false);
+    setDraftCondition("");
+    setDraftSize("");
+  }, []);
+
+  const clearAppliedFilters = useCallback(() => {
+    updateParams({
+      type: "",
+      region: "",
+      swap: "",
+      verified: "",
+      priceMin: "",
+      priceMax: "",
+      category: "",
+      district: "",
+      sort: "",
+      auctionEnds: "",
+      auctionMinBid: "",
+      minPhotos: "",
+      condition: "",
+      size: "",
+    });
+  }, [updateParams]);
+
+  const applyDraftFilters = useCallback(() => {
+    const normalizedSort =
+      draftType === "auction"
+        ? SORT_OPTIONS_AUCTION.some((option) => option.value === draftSort)
+          ? draftSort
+          : "ending_soon"
+        : SORT_OPTIONS_DEFAULT.some((option) => option.value === draftSort)
+          ? draftSort
+          : "newest";
+
+    const defaultSort = getDefaultSort(draftType);
+
+    updateParams({
+      type: draftType === "all" ? "" : draftType,
+      region: draftRegion,
+      district: draftDistrict.trim(),
+      category: draftCategory === "plant" ? "" : draftCategory,
+      swap: draftSwap ? "1" : "",
+      verified: draftVerified ? "1" : "",
+      priceMin: draftPriceMin.trim(),
+      priceMax: draftPriceMax.trim(),
+      sort: normalizedSort === defaultSort ? "" : normalizedSort,
+      auctionEnds: draftAuctionEnds,
+      auctionMinBid: draftAuctionMinBid.trim(),
+      minPhotos: draftMinPhotos ? "3" : "",
+      condition: draftCondition,
+      size: draftSize,
+    });
+
+    setFilterOpen(false);
+  }, [
+    draftAuctionEnds,
+    draftAuctionMinBid,
+    draftCategory,
+    draftCondition,
+    draftDistrict,
+    draftMinPhotos,
+    draftPriceMax,
+    draftPriceMin,
+    draftRegion,
+    draftSize,
+    draftSort,
+    draftSwap,
+    draftType,
+    draftVerified,
+    updateParams,
+  ]);
+
+  const sortOptions = currentType === "auction" ? SORT_OPTIONS_AUCTION : SORT_OPTIONS_DEFAULT;
+  const regionLabel = currentRegion
+    ? `Kraj: ${getRegionShortLabel(currentRegion)}`
+    : "Kraj: Vyberte";
+
+  const resultsLabel =
+    typeof resultsCount === "number"
+      ? `Zobraziť výsledky (${resultsCount})`
+      : "Zobraziť výsledky";
 
   return (
     <div className="space-y-3" data-pending={isPending || undefined}>
-      {/* Search */}
-      <form onSubmit={handleSearchSubmit} className="flex gap-2">
-        <div className="relative flex-1">
-          <Search
-            className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2"
-            aria-hidden
-          />
-          <input
-            key={`q-${currentQuery}`}
-            name="q"
-            type="search"
-            defaultValue={currentQuery}
-            placeholder="Hľadať (Monstera, Hoya…)"
-            className="border-input bg-background focus-visible:ring-ring flex h-11 min-h-[44px] w-full rounded-lg border py-2 pr-3 pl-9 text-sm outline-none focus-visible:ring-2"
-            aria-label="Vyhľadávanie"
-          />
-        </div>
-      </form>
-
-      {/* Region pill + Sort row */}
-      <div className="flex items-center gap-2">
-        <Drawer
-          open={regionDrawerOpen}
-          onOpenChange={setRegionDrawerOpen}
-          direction="bottom"
-        >
-          <DrawerTrigger asChild>
+      <div className="space-y-1.5">
+        <div className="border-input bg-background flex min-h-[44px] items-center rounded-full border px-3 py-1 shadow-sm">
+          <button
+            type="button"
+            onClick={openFullSearch}
+            className="flex min-h-[44px] flex-1 items-center gap-2 text-left"
+            aria-label="Otvoriť vyhľadávanie"
+          >
+            <Search className="text-muted-foreground size-4 shrink-0" aria-hidden />
+            <span className={cn("truncate text-sm", !currentQuery && "text-muted-foreground")}>
+              {currentQuery || "Hľadať rastlinu… (Monstera, Hoya, Alocasia)"}
+            </span>
+          </button>
+          {currentQuery ? (
             <button
               type="button"
-              className={cn(
-                "border-input bg-background focus-visible:ring-ring inline-flex min-h-[44px] shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-sm font-medium outline-none focus-visible:ring-2"
-              )}
-              aria-label="Vybrať kraj"
-              aria-expanded={regionDrawerOpen}
+              onClick={clearSearch}
+              className="text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-full"
+              aria-label="Odstrániť vyhľadávanie"
             >
-              <span className="text-muted-foreground">
-                Kraj: {getRegionShortLabel(currentRegion)}
-              </span>
-              <ChevronDown
-                className={cn(
-                  "text-muted-foreground size-4 transition-transform",
-                  regionDrawerOpen && "rotate-180"
-                )}
-                aria-hidden
-              />
+              <X className="size-4" aria-hidden />
             </button>
-          </DrawerTrigger>
-          <DrawerContent
-            className="rounded-t-2xl"
-            style={{ touchAction: "none" }}
-          >
-            <div className="mx-auto mt-2 h-1.5 w-10 shrink-0 rounded-full bg-muted" />
-            <DrawerHeader className="pb-2 text-center">
-              <DrawerTitle>Vybrať kraj</DrawerTitle>
-            </DrawerHeader>
-            <ul className="max-h-[60vh] overflow-y-auto px-4 pb-8" role="listbox">
-              {ROOTIE_REGIONS.map((r) => (
-                <li key={r} role="option" aria-selected={currentRegion === r}>
-                  <button
-                    type="button"
-                    onClick={() => handleRegionSelect(r)}
-                    className={cn(
-                      "flex w-full min-h-[44px] items-center justify-center rounded-lg py-3 text-sm font-medium transition-colors",
-                      currentRegion === r
-                        ? "bg-primary text-primary-foreground"
-                        : "hover:bg-accent"
-                    )}
-                  >
-                    {r === "All Slovakia" ? "Celé Slovensko" : r}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </DrawerContent>
-        </Drawer>
+          ) : null}
+        </div>
 
-        {/* Sort dropdown */}
-        <select
-          value={currentSort}
-          onChange={(e) => updateParams({ sort: e.target.value })}
-          className="border-input bg-background focus-visible:ring-ring flex h-11 min-h-[44px] flex-1 rounded-full border px-4 py-2 text-sm outline-none focus-visible:ring-2"
-          aria-label="Zoradiť"
-        >
-          {SORT_OPTIONS.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+        <p className="text-muted-foreground px-1 text-xs">
+          Tip: Skús napísať „mons“ a vyber z návrhov 👀
+        </p>
       </div>
 
-      {/* Plant quick categories — najčastejšie hľadané */}
+      {!currentRegion ? (
+        <section className="border-input bg-secondary/40 rounded-xl border p-3">
+          <p className="text-sm font-semibold">Vyber svoj kraj</p>
+          <p className="text-muted-foreground mt-0.5 text-xs">
+            Uvidíš ponuky najmä z okolia a dohodneš sa rýchlejšie.
+          </p>
+          <Button
+            type="button"
+            size="sm"
+            className="mt-3 min-h-[44px] w-full"
+            onClick={() => setRegionOpen(true)}
+          >
+            Vybrať kraj
+          </Button>
+        </section>
+      ) : null}
+
+      <div className="grid grid-cols-[1fr_auto] gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          onClick={() => setRegionOpen(true)}
+          className="min-h-[44px] justify-between rounded-full px-3 text-sm"
+          aria-label="Vybrať kraj"
+        >
+          <span className="inline-flex items-center gap-1.5">
+            <MapPin className="size-4" aria-hidden />
+            {regionLabel}
+          </span>
+          <ChevronDown className="size-4" aria-hidden />
+        </Button>
+
+        <Button
+          type="button"
+          variant="outline"
+          onClick={openFilters}
+          className="relative min-h-[44px] min-w-[44px] rounded-full px-3"
+          aria-label="Otvoriť filtre"
+        >
+          <Filter className="size-4" aria-hidden />
+          <span className="ml-1 text-sm font-medium">Filtre</span>
+          {activeFilterCount > 0 ? (
+            <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold">
+              {activeFilterCount}
+            </span>
+          ) : null}
+        </Button>
+      </div>
+
+      {activeFilterCount > 0 ? (
+        <p className="text-primary text-xs font-medium">Upravené podľa teba</p>
+      ) : null}
+
       <div
         className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         role="group"
-        aria-label="Kategórie rastlín"
+        aria-label="Rýchle filtre"
       >
-        {PLANT_QUICK_CATEGORIES.map((cat) => {
-          const Icon = cat.icon;
-          return (
-            <FilterChip
-              key={cat.id}
-              selected={isPlantCategorySelected(cat.searchQuery)}
-              onClick={() => handlePlantCategoryClick(cat.searchQuery)}
-              className="shrink-0 gap-1.5"
-            >
-              <Icon className="size-4 shrink-0" aria-hidden />
-              <span>{cat.label}</span>
-            </FilterChip>
-          );
-        })}
+        <FilterChip
+          selected={currentType !== "all" || typePickerOpen}
+          onClick={() => setTypePickerOpen((value) => !value)}
+          className="min-h-[40px] shrink-0"
+        >
+          <span>
+            Typ: {TYPE_OPTIONS.find((option) => option.value === currentType)?.label ?? "Všetko"}
+          </span>
+        </FilterChip>
+
+        <FilterChip
+          selected={currentSwap}
+          onClick={() => updateParams({ swap: currentSwap ? "" : "1" })}
+          className="min-h-[40px] shrink-0"
+          title="Ponuky, kde sa dá dohodnúť aj barter"
+        >
+          Výmena
+        </FilterChip>
+
+        <FilterChip
+          selected={currentVerified}
+          onClick={() => updateParams({ verified: currentVerified ? "" : "1" })}
+          className="min-h-[40px] shrink-0"
+          title="Predajcovia s overeným telefónom"
+        >
+          Overení
+        </FilterChip>
+
+        <FilterChip onClick={openFilters} className="min-h-[40px] shrink-0">
+          Cena
+        </FilterChip>
+
+        <FilterChip
+          selected={currentSort !== getDefaultSort(currentType)}
+          onClick={() => setSortOpen(true)}
+          className="min-h-[40px] shrink-0"
+        >
+          <span className="inline-flex items-center gap-1">
+            Triediť
+            <SlidersHorizontal className="size-3.5" aria-hidden />
+          </span>
+        </FilterChip>
       </div>
+
+      {typePickerOpen ? (
+        <div className="rounded-xl border border-input bg-background p-2">
+          <SegmentedControl
+            ariaLabel="Typ ponúk"
+            value={currentType}
+            onValueChange={setType}
+            options={TYPE_OPTIONS}
+          />
+        </div>
+      ) : null}
+
+      <Drawer open={regionOpen} onOpenChange={setRegionOpen} direction="bottom">
+        <DrawerContent className="rounded-t-2xl">
+          <DrawerHeader className="pb-2 text-left">
+            <DrawerTitle>Vyber kraj</DrawerTitle>
+          </DrawerHeader>
+
+          <div className="max-h-[60vh] space-y-2 overflow-y-auto px-4 pb-4">
+            <button
+              type="button"
+              className={cn(
+                "border-input bg-background hover:bg-accent flex min-h-[44px] w-full items-center justify-between rounded-xl border px-3 text-left text-sm",
+                currentRegion === "All Slovakia" && "border-primary text-primary"
+              )}
+              onClick={() => setRegion("All Slovakia")}
+            >
+              <span>Celé Slovensko</span>
+              {currentRegion === "All Slovakia" ? <span>✓</span> : null}
+            </button>
+
+            {SLOVAK_REGIONS.map((region) => (
+              <button
+                key={region}
+                type="button"
+                className={cn(
+                  "border-input bg-background hover:bg-accent flex min-h-[44px] w-full items-center justify-between rounded-xl border px-3 text-left text-sm",
+                  currentRegion === region && "border-primary text-primary"
+                )}
+                onClick={() => setRegion(region)}
+              >
+                <span>{region}</span>
+                {currentRegion === region ? <span>✓</span> : null}
+              </button>
+            ))}
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer open={sortOpen} onOpenChange={setSortOpen} direction="bottom">
+        <DrawerContent className="rounded-t-2xl">
+          <DrawerHeader className="pb-2 text-left">
+            <DrawerTitle>Triediť</DrawerTitle>
+            <p className="text-muted-foreground text-xs">Nájdi to, čo sa oplatí najviac.</p>
+          </DrawerHeader>
+
+          <div className="space-y-2 px-4 pb-5">
+            {sortOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setSort(option.value)}
+                className={cn(
+                  "border-input bg-background hover:bg-accent flex min-h-[44px] w-full items-center justify-between rounded-xl border px-3 text-left text-sm",
+                  currentSort === option.value && "border-primary text-primary"
+                )}
+              >
+                <span>{option.label}</span>
+                {currentSort === option.value ? <span>✓</span> : null}
+              </button>
+            ))}
+          </div>
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer open={filterOpen} onOpenChange={setFilterOpen} direction="bottom">
+        <DrawerContent className="rounded-t-2xl">
+          <DrawerHeader className="pb-1 text-left">
+            <DrawerTitle>Filtre</DrawerTitle>
+            <p className="text-muted-foreground text-xs">Nájdi presne to, čo hľadáš.</p>
+          </DrawerHeader>
+
+          <div className="max-h-[62vh] space-y-5 overflow-y-auto px-4 pb-4">
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold">Základ</h3>
+
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium">Typ</p>
+                <SegmentedControl
+                  ariaLabel="Typ"
+                  value={draftType}
+                  onValueChange={setDraftType}
+                  options={TYPE_OPTIONS}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="home-filter-region" className="text-xs font-medium">
+                  Kraj
+                </label>
+                <select
+                  id="home-filter-region"
+                  value={draftRegion}
+                  onChange={(event) => setDraftRegion(event.target.value)}
+                  className="border-input bg-background focus-visible:ring-ring h-11 min-h-[44px] w-full rounded-xl border px-3 text-sm outline-none focus-visible:ring-2"
+                >
+                  <option value="">Vybrať kraj</option>
+                  <option value="All Slovakia">Celé Slovensko</option>
+                  {SLOVAK_REGIONS.map((region) => (
+                    <option key={region} value={region}>
+                      {region}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="home-filter-district" className="text-xs font-medium">
+                  Okres
+                </label>
+                <input
+                  id="home-filter-district"
+                  value={draftDistrict}
+                  onChange={(event) => setDraftDistrict(event.target.value)}
+                  placeholder="Vybrať okres (voliteľné)"
+                  className="border-input bg-background focus-visible:ring-ring h-11 min-h-[44px] w-full rounded-xl border px-3 text-sm outline-none focus-visible:ring-2"
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium">Kategória</p>
+                <SegmentedControl
+                  ariaLabel="Kategória"
+                  value={draftCategory}
+                  onValueChange={(value) => setDraftCategory(value as "plant" | "accessory")}
+                  options={[
+                    { value: "plant", label: "Rastliny" },
+                    { value: "accessory", label: "Príslušenstvo" },
+                  ]}
+                />
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setDraftSwap((value) => !value)}
+                className={cn(
+                  "border-input bg-background flex min-h-[44px] w-full items-center justify-between rounded-xl border px-3 text-sm",
+                  draftSwap && "border-primary text-primary"
+                )}
+              >
+                <span>Výmena</span>
+                <span>{draftSwap ? "Zapnuté" : "Vypnuté"}</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setDraftVerified((value) => !value)}
+                className={cn(
+                  "border-input bg-background flex min-h-[44px] w-full items-center justify-between rounded-xl border px-3 text-sm",
+                  draftVerified && "border-primary text-primary"
+                )}
+              >
+                <span>Len overení predajcovia</span>
+                <span>{draftVerified ? "Zapnuté" : "Vypnuté"}</span>
+              </button>
+
+              <div className="space-y-2">
+                <p className="text-xs font-medium">Cena</p>
+                <div className="grid grid-cols-2 gap-2">
+                  <input
+                    value={draftPriceMin}
+                    onChange={(event) => setDraftPriceMin(event.target.value.replace(/[^0-9]/g, ""))}
+                    inputMode="numeric"
+                    placeholder="Od"
+                    className="border-input bg-background focus-visible:ring-ring h-11 min-h-[44px] rounded-xl border px-3 text-sm outline-none focus-visible:ring-2"
+                  />
+                  <input
+                    value={draftPriceMax}
+                    onChange={(event) => setDraftPriceMax(event.target.value.replace(/[^0-9]/g, ""))}
+                    inputMode="numeric"
+                    placeholder="Do"
+                    className="border-input bg-background focus-visible:ring-ring h-11 min-h-[44px] rounded-xl border px-3 text-sm outline-none focus-visible:ring-2"
+                  />
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={300}
+                  step={5}
+                  value={parsePositiveNumber(draftPriceMax) ?? 0}
+                  onChange={(event) => setDraftPriceMax(event.target.value)}
+                  className="w-full accent-[var(--color-primary)]"
+                  aria-label="Maximálna cena"
+                />
+              </div>
+            </section>
+
+            {(draftType === "all" || draftType === "auction") && (
+              <section className="space-y-3">
+                <h3 className="text-sm font-semibold">Aukcie</h3>
+
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium">Končí do</p>
+                  <div className="flex gap-2 overflow-x-auto pb-1">
+                    {AUCTION_ENDS_OPTIONS.map((option) => (
+                      <FilterChip
+                        key={option.value}
+                        selected={draftAuctionEnds === option.value}
+                        onClick={() =>
+                          setDraftAuctionEnds((current) =>
+                            current === option.value ? "" : option.value
+                          )
+                        }
+                        className="min-h-[38px] px-3 py-1.5 text-xs"
+                      >
+                        {option.label}
+                      </FilterChip>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5">
+                  <label htmlFor="home-filter-min-bid" className="text-xs font-medium">
+                    Minimálny príhoz (voliteľné)
+                  </label>
+                  <input
+                    id="home-filter-min-bid"
+                    value={draftAuctionMinBid}
+                    onChange={(event) =>
+                      setDraftAuctionMinBid(event.target.value.replace(/[^0-9]/g, ""))
+                    }
+                    inputMode="numeric"
+                    className="border-input bg-background focus-visible:ring-ring h-11 min-h-[44px] w-full rounded-xl border px-3 text-sm outline-none focus-visible:ring-2"
+                  />
+                </div>
+              </section>
+            )}
+
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold">Kvalita</h3>
+
+              <button
+                type="button"
+                onClick={() => setDraftMinPhotos((value) => !value)}
+                className={cn(
+                  "border-input bg-background flex min-h-[44px] w-full items-center justify-between rounded-xl border px-3 text-sm",
+                  draftMinPhotos && "border-primary text-primary"
+                )}
+              >
+                <span>Len s 3+ fotkami</span>
+                <span>{draftMinPhotos ? "Zapnuté" : "Vypnuté"}</span>
+              </button>
+
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium">Stav</p>
+                <div className="flex flex-wrap gap-2">
+                  {CONDITION_OPTIONS.map((condition) => (
+                    <FilterChip
+                      key={condition}
+                      selected={draftCondition === condition}
+                      onClick={() =>
+                        setDraftCondition((current) =>
+                          current === condition ? "" : condition
+                        )
+                      }
+                      className="min-h-[38px] px-3 py-1.5 text-xs"
+                    >
+                      {condition}
+                    </FilterChip>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <p className="text-xs font-medium">Veľkosť (S/M/L)</p>
+                <div className="flex gap-2">
+                  {SIZE_OPTIONS.map((size) => (
+                    <FilterChip
+                      key={size}
+                      selected={draftSize === size}
+                      onClick={() =>
+                        setDraftSize((current) => (current === size ? "" : size))
+                      }
+                      className="min-h-[38px] px-4 py-1.5 text-xs"
+                    >
+                      {size}
+                    </FilterChip>
+                  ))}
+                </div>
+              </div>
+            </section>
+
+            <p className="text-muted-foreground pb-1 text-[11px] leading-relaxed">
+              Rootie nerieši platbu ani dopravu, dohodnite sa priamo s predajcom cez Inbox.
+            </p>
+          </div>
+
+          <DrawerFooter className="border-t bg-background pt-3">
+            <Button type="button" className="min-h-[44px] w-full" onClick={applyDraftFilters}>
+              {resultsLabel}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-[44px] w-full"
+              onClick={() => {
+                resetDraftFilters();
+                clearAppliedFilters();
+                setFilterOpen(false);
+              }}
+            >
+              Vymazať filtre
+            </Button>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+
+      {currentQuery ? (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            className="bg-secondary text-secondary-foreground inline-flex min-h-[32px] items-center gap-1 rounded-full px-3 text-xs font-medium"
+            onClick={clearSearch}
+            aria-label="Odobrať vybranú rastlinu"
+          >
+            {currentQuery}
+            <X className="size-3" aria-hidden />
+          </button>
+        </div>
+      ) : null}
+
+      {activeFilterCount > 0 ? (
+        <div className="flex items-center justify-between">
+          <span className="text-muted-foreground text-xs">Aktívne filtre: {activeFilterCount}</span>
+          <button
+            type="button"
+            className="text-muted-foreground hover:text-foreground text-xs underline underline-offset-2"
+            onClick={clearAppliedFilters}
+          >
+            Vymazať filtre
+          </button>
+        </div>
+      ) : null}
+
+      <p className="text-muted-foreground text-xs">Zoradenie: {formatSortLabel(currentSort)}</p>
     </div>
   );
 }
