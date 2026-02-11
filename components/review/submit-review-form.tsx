@@ -66,7 +66,7 @@ export function SubmitReviewForm({
       )}
       {state?.ok === true && (
         <p className="text-emerald-600 text-sm">
-          Recenzia bola odoslaná.{" "}
+          Ďakujeme za hodnotenie.{" "}
           <Link href={`/profile/${sellerId}`} className="underline">
             Späť na profil
           </Link>

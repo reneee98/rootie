@@ -35,16 +35,10 @@ export default async function ListingPage({ params }: ListingPageProps) {
   const isOwnListing = currentUser?.id === listing.seller_id;
   const isAuthenticated = !!currentUser;
   const isFixed = listing.type === "fixed";
-  const isActive = listing.status === "active";
+  const isReserved = listing.status === "reserved";
   const isSold = listing.status === "sold";
 
-  const auctionEndsAt = listing.auction_ends_at
-    ? new Date(listing.auction_ends_at)
-    : null;
-  const auctionEnded =
-    !isFixed &&
-    (listing.status === "expired" ||
-      (auctionEndsAt != null && auctionEndsAt.getTime() <= Date.now()));
+  const auctionEnded = !isFixed && listing.status === "expired";
 
   return (
     <div className="bg-background min-h-dvh pb-40">
@@ -63,6 +57,11 @@ export default async function ListingPage({ params }: ListingPageProps) {
           {/* Title, badges, region */}
           <div className="space-y-2">
             <div className="flex flex-wrap items-center gap-1.5">
+              {isReserved && (
+                <Badge variant="secondary" className="font-medium">
+                  Rezervované
+                </Badge>
+              )}
               {isSold && (
                 <Badge variant="secondary" className="font-medium">
                   Predané

@@ -1,20 +1,18 @@
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 
-const ELIGIBILITY_MESSAGE_THRESHOLD = 2;
-
 export type ReviewEligibility = {
   eligible: boolean;
   reason?: string;
   messageCountSelf: number;
   messageCountOther: number;
   dealConfirmed: boolean;
+  orderDelivered: boolean;
   alreadyReviewed: boolean;
 };
 
 /**
- * Check if the current user can leave a review for the seller on the given listing
- * via the given thread. Eligibility: thread exists between reviewer and seller for this listing,
- * and (both sides have sent >= N messages OR deal confirmed), and no existing review.
+ * Check if current user can leave a review for seller on listing via thread.
+ * Strong gate: listing order status must be \"delivered\" and user must be buyer.
  */
 export async function getReviewEligibility(
   threadId: string,
@@ -24,34 +22,26 @@ export async function getReviewEligibility(
 ): Promise<ReviewEligibility> {
   const supabase = await createSupabaseServerClient();
 
-  const [threadRes, msgCountRes, confirmationsRes, dealRes, existingRes] =
-    await Promise.all([
-      supabase
-        .from("threads")
-        .select("id, user1_id, user2_id, deal_confirmed_at, order_delivered_at")
-        .eq("id", threadId)
-        .eq("listing_id", listingId)
-        .maybeSingle(),
-      supabase
-        .from("messages")
-        .select("sender_id")
-        .eq("thread_id", threadId),
-      supabase
-        .from("thread_deal_confirmations")
-        .select("user_id")
-        .eq("thread_id", threadId),
-      supabase
-        .from("threads")
-        .select("deal_confirmed_at")
-        .eq("id", threadId)
-        .single(),
-      supabase
-        .from("reviews")
-        .select("id")
-        .eq("reviewer_id", reviewerId)
-        .eq("listing_id", listingId)
-        .maybeSingle(),
-    ]);
+  const [threadRes, orderRes, existingRes] = await Promise.all([
+    supabase
+      .from("threads")
+      .select("id, user1_id, user2_id, context_type, listing_id")
+      .eq("id", threadId)
+      .eq("listing_id", listingId)
+      .maybeSingle(),
+    supabase
+      .from("orders")
+      .select("status, buyer_id, seller_id")
+      .eq("thread_id", threadId)
+      .eq("listing_id", listingId)
+      .maybeSingle(),
+    supabase
+      .from("reviews")
+      .select("id")
+      .eq("reviewer_id", reviewerId)
+      .eq("listing_id", listingId)
+      .maybeSingle(),
+  ]);
 
   const thread = threadRes.data;
   if (!thread || threadRes.error) {
@@ -61,6 +51,19 @@ export async function getReviewEligibility(
       messageCountSelf: 0,
       messageCountOther: 0,
       dealConfirmed: false,
+      orderDelivered: false,
+      alreadyReviewed: false,
+    };
+  }
+
+  if (thread.context_type !== "listing" || !thread.listing_id) {
+    return {
+      eligible: false,
+      reason: "Recenziu je možné vytvoriť len pre konverzáciu k inzerátu.",
+      messageCountSelf: 0,
+      messageCountOther: 0,
+      dealConfirmed: false,
+      orderDelivered: false,
       alreadyReviewed: false,
     };
   }
@@ -69,6 +72,18 @@ export async function getReviewEligibility(
     thread.user1_id === reviewerId || thread.user2_id === reviewerId;
   const otherId =
     thread.user1_id === reviewerId ? thread.user2_id : thread.user1_id;
+  if (!isParticipant) {
+    return {
+      eligible: false,
+      reason: "Nie ste účastník tejto konverzácie.",
+      messageCountSelf: 0,
+      messageCountOther: 0,
+      dealConfirmed: false,
+      orderDelivered: false,
+      alreadyReviewed: false,
+    };
+  }
+
   if (otherId !== sellerId) {
     return {
       eligible: false,
@@ -76,42 +91,50 @@ export async function getReviewEligibility(
       messageCountSelf: 0,
       messageCountOther: 0,
       dealConfirmed: false,
+      orderDelivered: false,
       alreadyReviewed: false,
     };
   }
 
-  const messages = msgCountRes.data ?? [];
-  const messageCountSelf = messages.filter((m) => m.sender_id === reviewerId).length;
-  const messageCountOther = messages.filter((m) => m.sender_id === sellerId).length;
-  const dealConfirmed = Boolean(dealRes.data?.deal_confirmed_at);
-  const orderDelivered = Boolean(threadRes.data?.order_delivered_at);
+  if (reviewerId === sellerId) {
+    return {
+      eligible: false,
+      reason: "Recenziu môže pridať iba kupujúci.",
+      messageCountSelf: 0,
+      messageCountOther: 0,
+      dealConfirmed: false,
+      orderDelivered: false,
+      alreadyReviewed: false,
+    };
+  }
+
+  if (orderRes.error && orderRes.error.code !== "42P01") {
+    console.error("getReviewEligibility order error:", orderRes.error);
+  }
+
+  const order = orderRes.error ? null : orderRes.data;
+  const orderDelivered = order?.status === "delivered";
   const alreadyReviewed = existingRes.data != null;
-
-  const thresholdMet =
-    (messageCountSelf >= ELIGIBILITY_MESSAGE_THRESHOLD &&
-      messageCountOther >= ELIGIBILITY_MESSAGE_THRESHOLD) ||
-    dealConfirmed;
-
-  // Buyer can only leave review after confirming "Objednávka doručená"
-  const eligible =
-    thresholdMet && !alreadyReviewed && orderDelivered;
+  const isOrderBuyer = order?.buyer_id === reviewerId;
+  const isOrderSeller = order?.seller_id === sellerId;
+  const eligible = Boolean(orderDelivered && isOrderBuyer && isOrderSeller && !alreadyReviewed);
 
   let reason: string | undefined;
   if (alreadyReviewed) reason = "Už ste hodnotili tento inzerát.";
+  else if (!order)
+    reason = "Recenziu môžete pridať až po vytvorení objednávky v tejto konverzácii.";
+  else if (!isOrderBuyer || !isOrderSeller)
+    reason = "Recenziu môže pridať len kupujúci tejto objednávky.";
   else if (!orderDelivered)
-    reason = "Môžete hodnotiť po potvrdení, že objednávka bola doručená.";
-  else if (!thresholdMet)
-    reason =
-      "Môžete hodnotiť po aspoň " +
-      ELIGIBILITY_MESSAGE_THRESHOLD +
-      " správach od oboch strán alebo po potvrdení dohody oboma.";
+    reason = "Recenziu môžete pridať až po potvrdení stavu „Doručené“.";
 
   return {
     eligible,
     reason,
-    messageCountSelf,
-    messageCountOther,
-    dealConfirmed,
+    messageCountSelf: 0,
+    messageCountOther: 0,
+    dealConfirmed: false,
+    orderDelivered,
     alreadyReviewed,
   };
 }
@@ -129,17 +152,33 @@ export async function getThreadDealState(
 ): Promise<ThreadDealState | null> {
   const supabase = await createSupabaseServerClient();
 
-  const [threadRes, confirmationsRes] = await Promise.all([
-    supabase
+  const isMissingColumnError = (
+    e: { code?: string; message?: string } | null,
+    columnName: string
+  ) =>
+    (e?.code === "42703" || e?.code === "PGRST204") &&
+    (e.message ?? "").includes(columnName);
+
+  let hasOrderDeliveredAtColumn = true;
+  let threadRes = await supabase
+    .from("threads")
+    .select("deal_confirmed_at, order_delivered_at, user1_id, user2_id")
+    .eq("id", threadId)
+    .single();
+
+  if (isMissingColumnError(threadRes.error, "order_delivered_at")) {
+    hasOrderDeliveredAtColumn = false;
+    threadRes = await supabase
       .from("threads")
-      .select("deal_confirmed_at, order_delivered_at, user1_id, user2_id")
+      .select("deal_confirmed_at, user1_id, user2_id")
       .eq("id", threadId)
-      .single(),
-    supabase
-      .from("thread_deal_confirmations")
-      .select("user_id")
-      .eq("thread_id", threadId),
-  ]);
+      .single();
+  }
+
+  const confirmationsRes = await supabase
+    .from("thread_deal_confirmations")
+    .select("user_id")
+    .eq("thread_id", threadId);
 
   if (threadRes.error || !threadRes.data) return null;
 
@@ -154,7 +193,10 @@ export async function getThreadDealState(
     dealConfirmedAt: thread.deal_confirmed_at ?? null,
     iConfirmed: confirmedUserIds.has(currentUserId),
     otherConfirmed: confirmedUserIds.has(otherId),
-    orderDeliveredAt: thread.order_delivered_at ?? null,
+    orderDeliveredAt: hasOrderDeliveredAtColumn
+      ? ((thread as { order_delivered_at?: string | null }).order_delivered_at ??
+        null)
+      : null,
   };
 }
 
@@ -184,7 +226,7 @@ export type ReviewableListing = {
 
 /**
  * Listings for which the current user can leave a review for the given seller
- * (they have a listing thread, eligibility met, no review yet).
+ * (listing thread exists, order delivered, no review yet).
  */
 export async function getReviewableListings(
   sellerId: string,

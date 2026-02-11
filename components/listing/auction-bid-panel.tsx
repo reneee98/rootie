@@ -115,7 +115,10 @@ export function AuctionBidPanel({
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      const channelToRemove = channel;
+      setTimeout(() => {
+        supabase.removeChannel(channelToRemove);
+      }, 0);
     };
   }, [listingId]);
 

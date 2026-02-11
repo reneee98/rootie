@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -15,15 +15,20 @@ type PhotoGalleryProps = {
 export function PhotoGallery({ photos, alt }: PhotoGalleryProps) {
   const [current, setCurrent] = useState(0);
   const [loaded, setLoaded] = useState<Record<number, boolean>>({});
+  const [failed, setFailed] = useState<Record<number, boolean>>({});
   const scrollRef = useRef<HTMLDivElement>(null);
-
-  if (photos.length === 0) {
-    return (
-      <div className="bg-muted flex aspect-[4/3] w-full items-center justify-center rounded-none">
-        <span className="text-muted-foreground text-sm">Bez fotky</span>
-      </div>
-    );
-  }
+  const markLoaded = useCallback((index: number) => {
+    setLoaded((prev) => {
+      if (prev[index]) return prev;
+      return { ...prev, [index]: true };
+    });
+  }, []);
+  const markFailed = useCallback((index: number) => {
+    setFailed((prev) => {
+      if (prev[index]) return prev;
+      return { ...prev, [index]: true };
+    });
+  }, []);
 
   const handlePrev = useCallback(() => {
     setCurrent((c) => (c > 0 ? c - 1 : photos.length - 1));
@@ -47,6 +52,14 @@ export function PhotoGallery({ photos, alt }: PhotoGalleryProps) {
     setCurrent(Math.min(index, photos.length - 1));
   }, [photos.length]);
 
+  if (photos.length === 0) {
+    return (
+      <div className="bg-muted flex aspect-[4/3] w-full items-center justify-center rounded-none">
+        <span className="text-muted-foreground text-sm">Bez fotky</span>
+      </div>
+    );
+  }
+
   return (
     <div className="relative">
       {/* Swipeable strip */}
@@ -63,22 +76,50 @@ export function PhotoGallery({ photos, alt }: PhotoGalleryProps) {
             key={p.id}
             className="bg-muted relative aspect-[4/3] w-full shrink-0 snap-start snap-always"
           >
-            {!loaded[i] && (
+            {!loaded[i] && !failed[i] && (
               <div
                 className="absolute inset-0 animate-pulse bg-muted"
                 aria-hidden
               />
             )}
-            <img
-              src={p.url}
-              alt={i === 0 ? alt : `${alt} — fotka ${i + 1}`}
-              className={cn(
-                "size-full object-cover transition-opacity duration-200",
-                loaded[i] ? "opacity-100" : "opacity-0"
-              )}
-              loading={i === 0 ? "eager" : "lazy"}
-              onLoad={() => setLoaded((prev) => ({ ...prev, [i]: true }))}
-            />
+            {failed[i] ? (
+              <div className="text-muted-foreground flex size-full flex-col items-center justify-center gap-2 text-sm">
+                <ImageOff className="size-5" aria-hidden />
+                <span>Bez fotky</span>
+              </div>
+            ) : (
+              <img
+                ref={(node) => {
+                  if (!node || !node.complete) return;
+                  if (node.naturalWidth <= 16 || node.naturalHeight <= 16) {
+                    markFailed(i);
+                    markLoaded(i);
+                    return;
+                  }
+                  markLoaded(i);
+                }}
+                src={p.url}
+                alt={i === 0 ? alt : `${alt} — fotka ${i + 1}`}
+                className={cn(
+                  "size-full object-cover transition-opacity duration-200",
+                  loaded[i] ? "opacity-100" : "opacity-0"
+                )}
+                loading={i === 0 ? "eager" : "lazy"}
+                onLoad={(event) => {
+                  const image = event.currentTarget;
+                  if (image.naturalWidth <= 16 || image.naturalHeight <= 16) {
+                    markFailed(i);
+                    markLoaded(i);
+                    return;
+                  }
+                  markLoaded(i);
+                }}
+                onError={() => {
+                  markFailed(i);
+                  markLoaded(i);
+                }}
+              />
+            )}
           </div>
         ))}
       </div>

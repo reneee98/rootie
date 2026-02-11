@@ -11,10 +11,45 @@ export type SendMessageResult =
 export type SendMessageInput = {
   threadId: string;
   body: string;
-  messageType?: "text" | "offer_price" | "offer_swap" | "system";
+  messageType?: "text" | "offer_price" | "offer_swap" | "system" | "order_status";
   metadata?: Record<string, unknown>;
   attachments?: { url: string; type?: string }[];
 };
+
+function parsePositiveAmount(value: unknown): number | null {
+  if (typeof value === "number" && Number.isFinite(value) && value > 0) {
+    return Math.round(value * 100) / 100;
+  }
+  if (typeof value === "string") {
+    const parsed = parseFloat(value.replace(",", "."));
+    if (Number.isFinite(parsed) && parsed > 0) {
+      return Math.round(parsed * 100) / 100;
+    }
+  }
+  return null;
+}
+
+function sanitizeAttachments(
+  raw: { url: string; type?: string }[] | undefined
+): { url: string; type?: string }[] {
+  return (raw ?? [])
+    .map((att) => ({
+      url: typeof att.url === "string" ? att.url.trim() : "",
+      type: typeof att.type === "string" ? att.type.trim() : undefined,
+    }))
+    .filter((att) => att.url.length > 0);
+}
+
+function sanitizeStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  const unique = new Set<string>();
+  for (const item of value) {
+    if (typeof item !== "string") continue;
+    const next = item.trim();
+    if (next) unique.add(next);
+  }
+  return [...unique];
+}
 
 export async function sendMessage(
   input: SendMessageInput
@@ -22,18 +57,35 @@ export async function sendMessage(
   const user = await requireUser("/inbox");
   const supabase = await createSupabaseServerClient();
 
-  const body = input.body?.trim() ?? "";
-  if (!body && (!input.attachments || input.attachments.length === 0)) {
-    return { ok: false, error: "Správa alebo príloha je povinná." };
+  const threadId = typeof input.threadId === "string" ? input.threadId.trim() : "";
+  if (!threadId) {
+    return { ok: false, error: "Konverzácia neexistuje." };
   }
 
-  const { data: thread } = await supabase
-    .from("threads")
-    .select("id, user1_id, user2_id")
-    .eq("id", input.threadId)
-    .single();
+  const body = input.body?.trim() ?? "";
 
-  if (!thread) {
+  // Rovnaký klient ako na stránke chat (session + RLS) – ak stránka vlákno načítala, tu ho nájdeme
+  const { data: thread, error: threadError } = await supabase
+    .from("threads")
+    .select("id, user1_id, user2_id, context_type, listing_id")
+    .eq("id", threadId)
+    .maybeSingle();
+
+  if (threadError) {
+    console.error("sendMessage thread fetch error:", threadError.message, { threadId });
+    return { ok: false, error: "Konverzácia neexistuje." };
+  }
+
+  const isParticipant =
+    thread &&
+    (thread.user1_id === user.id || thread.user2_id === user.id);
+
+  if (!thread || !isParticipant) {
+    console.error("sendMessage: thread not found or user not participant", {
+      threadId,
+      userId: user.id,
+      hasThread: !!thread,
+    });
     return { ok: false, error: "Konverzácia neexistuje." };
   }
 
@@ -52,28 +104,156 @@ export async function sendMessage(
 
   const messageType = input.messageType ?? "text";
   const metadata = input.metadata ?? {};
-  const attachments = input.attachments ?? [];
+  const attachments = sanitizeAttachments(input.attachments);
+
+  let listingSellerId: string | null = null;
+  if (thread.context_type === "listing" && thread.listing_id) {
+    const { data: listing } = await supabase
+      .from("listings")
+      .select("seller_id")
+      .eq("id", thread.listing_id)
+      .maybeSingle();
+    listingSellerId = listing?.seller_id ?? null;
+  }
+
+  const isListingThread = thread.context_type === "listing";
+  const isSellerInListingThread = Boolean(
+    isListingThread && listingSellerId === user.id
+  );
+  const isBuyerInListingThread = Boolean(
+    isListingThread && listingSellerId && listingSellerId !== user.id
+  );
+
+  let normalizedBody = body;
+  let normalizedMetadata: Record<string, unknown> = {};
+  let normalizedAttachments = attachments;
+
+  if (messageType === "text") {
+    if (!body && attachments.length === 0) {
+      return { ok: false, error: "Správa alebo príloha je povinná." };
+    }
+  } else if (messageType === "offer_price") {
+    if (!isListingThread || !listingSellerId) {
+      return { ok: false, error: "Ponuku ceny je možné poslať len v chate k inzerátu." };
+    }
+    const amount =
+      parsePositiveAmount(metadata["amount_eur"]) ??
+      parsePositiveAmount(metadata["amount"]) ??
+      parsePositiveAmount(body);
+    if (amount == null) {
+      return { ok: false, error: "Zadajte platnú sumu." };
+    }
+
+    const counterTo =
+      typeof metadata["counter_to_message_id"] === "string"
+        ? metadata["counter_to_message_id"].trim()
+        : "";
+
+    if (isSellerInListingThread) {
+      if (!counterTo) {
+        return {
+          ok: false,
+          error: "Predajca môže poslať cenu len ako protiponuku na existujúcu ponuku.",
+        };
+      }
+
+      const { data: originalOffer } = await supabase
+        .from("messages")
+        .select("id, sender_id, message_type")
+        .eq("id", counterTo)
+        .eq("thread_id", threadId)
+        .maybeSingle();
+
+      if (
+        !originalOffer ||
+        originalOffer.sender_id === user.id ||
+        !["offer_price", "offer_swap"].includes(
+          String(originalOffer.message_type ?? "")
+        )
+      ) {
+        return { ok: false, error: "Pôvodná ponuka pre protiponuku sa nenašla." };
+      }
+
+      normalizedMetadata = {
+        amount_eur: amount,
+        counter_to_message_id: counterTo,
+      };
+    } else if (isBuyerInListingThread) {
+      if (counterTo) {
+        return { ok: false, error: "Kupujúci nemôže poslať protiponuku." };
+      }
+      normalizedMetadata = { amount_eur: amount };
+    } else {
+      return { ok: false, error: "Nemáte oprávnenie poslať ponuku ceny." };
+    }
+
+    normalizedBody = body || String(amount);
+    normalizedAttachments = [];
+  } else if (messageType === "offer_swap") {
+    if (!isBuyerInListingThread) {
+      return { ok: false, error: "Ponuku výmeny môže v tomto chate poslať iba kupujúci." };
+    }
+
+    const swapForTextCandidate =
+      typeof metadata["swap_for_text"] === "string"
+        ? metadata["swap_for_text"]
+        : body;
+    const swapForText = swapForTextCandidate.trim();
+    if (!swapForText) {
+      return { ok: false, error: "Popíšte, čo ponúkate na výmenu." };
+    }
+
+    const photoUrls = Array.from(
+      new Set([
+        ...sanitizeStringArray(metadata["photo_urls"]),
+        ...attachments.map((att) => att.url),
+      ])
+    );
+
+    normalizedMetadata = {
+      swap_for_text: swapForText,
+      ...(photoUrls.length > 0 ? { photo_urls: photoUrls } : {}),
+    };
+    normalizedBody = swapForText;
+  } else if (messageType === "system" || messageType === "order_status") {
+    if (!isSellerInListingThread) {
+      return { ok: false, error: "Takúto správu môže odoslať iba predajca." };
+    }
+    if (!body) {
+      return { ok: false, error: "Text správy je povinný." };
+    }
+    normalizedMetadata = metadata;
+    normalizedAttachments = [];
+  } else {
+    return { ok: false, error: "Nepodporovaný typ správy." };
+  }
 
   const { data: msg, error } = await supabase
     .from("messages")
     .insert({
-      thread_id: input.threadId,
+      thread_id: threadId,
       sender_id: user.id,
-      body: body || " ",
+      body: normalizedBody || " ",
       message_type: messageType,
-      metadata,
-      attachments,
+      metadata: normalizedMetadata,
+      attachments: normalizedAttachments,
     })
     .select("id")
     .single();
 
   if (error) {
     console.error("Message insert error:", error);
-    return { ok: false, error: "Nepodarilo sa odoslať správu." };
+    const message =
+      error.code === "23503"
+        ? "Konverzácia alebo používateľ už neexistuje."
+        : error.code === "42501" || error.message?.includes("policy")
+          ? "Nemáte oprávnenie odoslať správu (možno vás druhá strana zablokovala)."
+          : error.message ?? "Nepodarilo sa odoslať správu.";
+    return { ok: false, error: message };
   }
 
   revalidatePath("/inbox");
-  revalidatePath(`/chat/${input.threadId}`);
+  revalidatePath(`/chat/${threadId}`);
 
   return { ok: true, messageId: msg.id };
 }

@@ -6,7 +6,7 @@ create extension if not exists "uuid-ossp";
 
 -- Enums
 create type listing_type as enum ('fixed', 'auction');
-create type listing_status as enum ('active', 'sold', 'expired', 'removed');
+create type listing_status as enum ('active', 'reserved', 'sold', 'expired', 'removed');
 create type listing_category as enum ('plant', 'accessory');
 create type thread_context_type as enum ('listing', 'wanted', 'direct');
 create type reaction_type as enum ('like', 'want', 'wow', 'funny', 'sad');
@@ -45,6 +45,21 @@ create index idx_profiles_region on public.profiles (region);
 create index idx_profiles_is_seller on public.profiles (is_seller) where is_seller = true;
 
 comment on table public.profiles is 'Public profile and seller summary; id = auth.users.id';
+
+-- =============================================================================
+-- Private default shipping address (owner-only via RLS table, never public)
+-- =============================================================================
+create table public.profile_shipping_addresses (
+  user_id uuid primary key references public.profiles (id) on delete cascade,
+  name text not null,
+  street text not null,
+  city text not null,
+  zip text not null,
+  country text not null,
+  phone text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
 
 -- =============================================================================
 -- Plant taxa (autocomplete / taxonomy)
@@ -94,6 +109,8 @@ create table public.listings (
 create index idx_listings_seller on public.listings (seller_id);
 create index idx_listings_status_region_created on public.listings (status, region, created_at desc);
 create index idx_listings_auction_ends on public.listings (auction_ends_at) where type = 'auction' and status = 'active';
+create index idx_listings_seller_status_created on public.listings (seller_id, status, created_at desc);
+create index idx_listings_active_type_created on public.listings (type, created_at desc) where status = 'active';
 create index idx_listings_plant_taxon on public.listings (plant_taxon_id) where plant_taxon_id is not null;
 
 -- =============================================================================
@@ -246,6 +263,46 @@ create table public.thread_deal_confirmations (
 create index idx_thread_deal_confirmations_user on public.thread_deal_confirmations (user_id);
 
 -- =============================================================================
+-- Orders (coordination-only; no payment processing)
+-- =============================================================================
+create type order_status_type as enum (
+  'negotiating',
+  'price_accepted',
+  'address_provided',
+  'shipped',
+  'delivered',
+  'cancelled'
+);
+
+create table public.orders (
+  id uuid primary key default gen_random_uuid(),
+  thread_id uuid not null references public.threads (id) on delete cascade,
+  listing_id uuid not null references public.listings (id) on delete cascade,
+  buyer_id uuid not null references public.profiles (id) on delete cascade,
+  seller_id uuid not null references public.profiles (id) on delete cascade,
+  status order_status_type not null default 'negotiating',
+  accepted_price_eur numeric(10, 2),
+  shipping_address jsonb,
+  tracking_number text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint orders_buyer_not_seller check (buyer_id <> seller_id),
+  constraint orders_price_required_for_active_status check (
+    status in ('negotiating', 'cancelled')
+    or accepted_price_eur is not null
+  )
+);
+
+create unique index idx_orders_thread_unique on public.orders (thread_id);
+create index idx_orders_buyer on public.orders (buyer_id, status);
+create index idx_orders_seller on public.orders (seller_id, status);
+create index idx_orders_listing on public.orders (listing_id);
+
+comment on table public.orders is 'Order/deal coordination state for listing threads. No payment processing.';
+comment on column public.orders.shipping_address is
+  'Private shipping address shared only in the order thread: {name, street, city, zip, country, phone?}';
+
+-- =============================================================================
 -- Reports
 -- =============================================================================
 create table public.reports (
@@ -298,8 +355,170 @@ create trigger wanted_requests_updated_at before update on public.wanted_request
   for each row execute function public.set_updated_at();
 create trigger threads_updated_at before update on public.threads
   for each row execute function public.set_updated_at();
+create trigger orders_updated_at before update on public.orders
+  for each row execute function public.set_updated_at();
+create trigger profile_shipping_addresses_updated_at before update on public.profile_shipping_addresses
+  for each row execute function public.set_updated_at();
 create trigger reports_updated_at before update on public.reports
   for each row execute function public.set_updated_at();
+
+-- =============================================================================
+-- Orders integrity/transition guard
+-- =============================================================================
+create or replace function public.orders_validate_integrity()
+returns trigger as $$
+declare
+  t record;
+  l record;
+  actor uuid;
+begin
+  actor := auth.uid();
+
+  select id, context_type, listing_id, user1_id, user2_id
+  into t
+  from public.threads
+  where id = new.thread_id;
+
+  if t.id is null then
+    raise exception 'Order thread does not exist';
+  end if;
+
+  if t.context_type <> 'listing' then
+    raise exception 'Orders can be created only for listing threads';
+  end if;
+
+  if t.listing_id is distinct from new.listing_id then
+    raise exception 'Order listing_id must match thread listing_id';
+  end if;
+
+  select id, seller_id into l
+  from public.listings
+  where id = new.listing_id;
+
+  if l.id is null then
+    raise exception 'Order listing does not exist';
+  end if;
+
+  if l.seller_id is distinct from new.seller_id then
+    raise exception 'Order seller_id must match listing seller_id';
+  end if;
+
+  if not (
+    (t.user1_id = new.buyer_id and t.user2_id = new.seller_id)
+    or (t.user2_id = new.buyer_id and t.user1_id = new.seller_id)
+  ) then
+    raise exception 'Order buyer/seller must match thread participants';
+  end if;
+
+  if new.status = 'address_provided' and new.shipping_address is null then
+    raise exception 'Shipping address is required for status address_provided';
+  end if;
+
+  if new.status in ('price_accepted', 'address_provided', 'shipped', 'delivered')
+     and new.accepted_price_eur is null then
+    raise exception 'Accepted price is required for active order statuses';
+  end if;
+
+  if tg_op = 'UPDATE' then
+    if new.thread_id is distinct from old.thread_id
+      or new.listing_id is distinct from old.listing_id
+      or new.buyer_id is distinct from old.buyer_id
+      or new.seller_id is distinct from old.seller_id then
+      raise exception 'Order relations cannot be changed';
+    end if;
+
+    if new.shipping_address is distinct from old.shipping_address
+       and actor is distinct from old.buyer_id then
+      raise exception 'Only buyer can change shipping address';
+    end if;
+
+    if new.status is distinct from old.status then
+      case new.status
+        when 'price_accepted' then
+          if actor is distinct from old.seller_id then
+            raise exception 'Only seller can set status price_accepted';
+          end if;
+          if old.status not in ('negotiating', 'price_accepted', 'cancelled') then
+            raise exception 'Invalid transition to price_accepted from %', old.status;
+          end if;
+        when 'address_provided' then
+          if actor is distinct from old.buyer_id then
+            raise exception 'Only buyer can set status address_provided';
+          end if;
+          if old.status not in ('price_accepted', 'address_provided') then
+            raise exception 'Invalid transition to address_provided from %', old.status;
+          end if;
+          if new.shipping_address is null then
+            raise exception 'Shipping address is required for status address_provided';
+          end if;
+        when 'shipped' then
+          if actor is distinct from old.seller_id then
+            raise exception 'Only seller can set status shipped';
+          end if;
+          if old.status not in ('address_provided', 'shipped') then
+            raise exception 'Invalid transition to shipped from %', old.status;
+          end if;
+        when 'delivered' then
+          if actor is distinct from old.buyer_id then
+            raise exception 'Only buyer can set status delivered';
+          end if;
+          if old.status not in ('shipped', 'delivered') then
+            raise exception 'Invalid transition to delivered from %', old.status;
+          end if;
+        when 'cancelled' then
+          if actor is distinct from old.buyer_id and actor is distinct from old.seller_id then
+            raise exception 'Only buyer or seller can cancel the order';
+          end if;
+        when 'negotiating' then
+          raise exception 'Status cannot be changed back to negotiating';
+      end case;
+    end if;
+  end if;
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger orders_validate_integrity_trigger
+  before insert or update on public.orders
+  for each row execute function public.orders_validate_integrity();
+
+-- =============================================================================
+-- Listing lifecycle sync from order status (active -> reserved -> sold)
+-- =============================================================================
+create or replace function public.listings_sync_status_from_order()
+returns trigger as $$
+declare
+  next_status public.listing_status;
+begin
+  if new.status = 'delivered' then
+    next_status := 'sold';
+  elsif new.status in ('price_accepted', 'address_provided', 'shipped') then
+    next_status := 'reserved';
+  elsif new.status = 'cancelled' then
+    if tg_op = 'UPDATE' and old.status = 'shipped' then
+      next_status := 'reserved';
+    else
+      next_status := 'active';
+    end if;
+  else
+    next_status := 'active';
+  end if;
+
+  update public.listings
+  set status = next_status,
+      updated_at = now()
+  where id = new.listing_id
+    and status not in ('removed', 'expired')
+    and status is distinct from next_status;
+
+  return new;
+end;
+$$ language plpgsql security definer;
+
+create trigger listings_sync_status_from_order_trigger
+  after insert or update of status on public.orders
+  for each row execute function public.listings_sync_status_from_order();
 
 -- =============================================================================
 -- Deal confirmed: listing = seller confirms → set deal_confirmed_at; wanted/direct = both confirm

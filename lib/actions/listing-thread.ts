@@ -45,7 +45,8 @@ export async function getOrCreateListingThread(listingId: string) {
     .select("id")
     .eq("context_type", "listing")
     .eq("listing_id", listingId)
-    .or(`and(user1_id.eq.${user1Id},user2_id.eq.${user2Id})`)
+    .eq("user1_id", user1Id)
+    .eq("user2_id", user2Id)
     .maybeSingle();
 
   if (existing) {
@@ -101,7 +102,8 @@ export async function getListingThreadIdIfExists(
     .select("id")
     .eq("context_type", "listing")
     .eq("listing_id", listingId)
-    .or(`and(user1_id.eq.${user1Id},user2_id.eq.${user2Id})`)
+    .eq("user1_id", user1Id)
+    .eq("user2_id", user2Id)
     .maybeSingle();
   return thread?.id ?? null;
 }
@@ -156,7 +158,8 @@ export async function createListingThreadWithOffer(
     .select("id")
     .eq("context_type", "listing")
     .eq("listing_id", listingId)
-    .or(`and(user1_id.eq.${user1Id},user2_id.eq.${user2Id})`)
+    .eq("user1_id", user1Id)
+    .eq("user2_id", user2Id)
     .maybeSingle();
 
   let threadId: string;
@@ -187,7 +190,10 @@ export async function createListingThreadWithOffer(
       ? String(amount!.toFixed(2))
       : (swapBody ?? "").trim() || "Ponúkam výmenu.";
     const messageType = offerType === "price" ? "offer_price" : "offer_swap";
-    const metadata = offerType === "price" ? { amount: amount! } : {};
+    const metadata =
+      offerType === "price"
+        ? { amount_eur: amount! }
+        : { swap_for_text: body };
 
     const { error: msgErr } = await supabase.from("messages").insert({
       thread_id: threadId,
@@ -195,6 +201,7 @@ export async function createListingThreadWithOffer(
       body,
       message_type: messageType,
       metadata,
+      attachments: [],
     });
 
     if (msgErr) {

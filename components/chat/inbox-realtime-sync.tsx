@@ -40,7 +40,10 @@ export function InboxRealtimeSync({ threadIds }: InboxRealtimeSyncProps) {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      const channelToRemove = channel;
+      setTimeout(() => {
+        supabase.removeChannel(channelToRemove);
+      }, 0);
     };
   }, [router, threadIds.slice().sort().join(",")]);
 

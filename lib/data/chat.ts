@@ -4,7 +4,12 @@ import { createSupabaseServerClient } from "@/lib/supabaseClient";
 // Types
 // ---------------------------------------------------------------------------
 
-export type MessageType = "text" | "offer_price" | "offer_swap" | "system";
+export type MessageType =
+  | "text"
+  | "offer_price"
+  | "offer_swap"
+  | "system"
+  | "order_status";
 
 export type ChatMessage = {
   id: string;

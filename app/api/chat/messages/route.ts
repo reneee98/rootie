@@ -13,9 +13,16 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const threadId = searchParams.get("threadId");
   const before = searchParams.get("before");
+  const after = searchParams.get("after");
 
   if (!threadId) {
     return new Response(JSON.stringify({ error: "Missing threadId" }), {
+      status: 400,
+    });
+  }
+
+  if (before && after) {
+    return new Response(JSON.stringify({ error: "Use either before or after, not both" }), {
       status: 400,
     });
   }
@@ -35,16 +42,45 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  const mapMessage = (m: {
+    id: string;
+    thread_id: string;
+    sender_id: string;
+    body: string;
+    message_type: string | null;
+    metadata: Record<string, unknown> | null;
+    attachments: unknown;
+    created_at: string;
+  }) => ({
+    id: m.id,
+    thread_id: m.thread_id,
+    sender_id: m.sender_id,
+    body: m.body,
+    message_type: m.message_type ?? "text",
+    metadata: m.metadata ?? {},
+    attachments: Array.isArray(m.attachments) ? m.attachments : [],
+    created_at: m.created_at,
+  });
+
   const limit = 50;
   let q = supabase
     .from("messages")
     .select("id, thread_id, sender_id, body, message_type, metadata, attachments, created_at")
-    .eq("thread_id", threadId)
-    .order("created_at", { ascending: false })
-    .limit(limit + 1);
+    .eq("thread_id", threadId);
 
-  if (before) {
-    q = q.lt("created_at", before);
+  if (after) {
+    q = q
+      .gte("created_at", after)
+      .order("created_at", { ascending: true })
+      .limit(limit);
+  } else {
+    q = q
+      .order("created_at", { ascending: false })
+      .limit(limit + 1);
+
+    if (before) {
+      q = q.lt("created_at", before);
+    }
   }
 
   const { data: rows, error } = await q;
@@ -55,19 +91,15 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  if (after) {
+    const messages = (rows ?? []).map(mapMessage);
+    return Response.json({ messages, hasMore: false });
+  }
+
   const list = rows ?? [];
   const hasMore = list.length > limit;
   const slice = hasMore ? list.slice(0, limit) : list;
-  const messages = slice.reverse().map((m) => ({
-    id: m.id,
-    thread_id: m.thread_id,
-    sender_id: m.sender_id,
-    body: m.body,
-    message_type: m.message_type ?? "text",
-    metadata: m.metadata ?? {},
-    attachments: Array.isArray(m.attachments) ? m.attachments : [],
-    created_at: m.created_at,
-  }));
+  const messages = slice.reverse().map(mapMessage);
 
   return Response.json({ messages, hasMore });
 }

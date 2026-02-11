@@ -29,6 +29,21 @@ create policy "profiles_update_moderator" on public.profiles for update
   using (public.current_user_is_moderator());
 
 -- =============================================================================
+-- Private default shipping addresses — owner only
+-- =============================================================================
+alter table public.profile_shipping_addresses enable row level security;
+
+create policy "profile_shipping_addresses_select_own" on public.profile_shipping_addresses for select
+  using (user_id = auth.uid());
+
+create policy "profile_shipping_addresses_insert_own" on public.profile_shipping_addresses for insert
+  with check (user_id = auth.uid());
+
+create policy "profile_shipping_addresses_update_own" on public.profile_shipping_addresses for update
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+-- =============================================================================
 -- Listings
 -- =============================================================================
 alter table public.listings enable row level security;
@@ -43,6 +58,17 @@ create policy "listings_select_public" on public.listings for select
 -- Owner can read their own (any status)
 create policy "listings_select_own" on public.listings for select
   using (seller_id = auth.uid());
+
+-- Buyer/seller in order flow can read listing detail even when it is reserved/sold
+create policy "listings_select_order_participant" on public.listings for select
+  using (
+    exists (
+      select 1
+      from public.orders o
+      where o.listing_id = listings.id
+        and (o.buyer_id = auth.uid() or o.seller_id = auth.uid())
+    )
+  );
 
 -- Moderators can read any listing (for moderation context)
 create policy "listings_select_moderator" on public.listings for select
@@ -84,6 +110,17 @@ create policy "listing_photos_select_public" on public.listing_photos for select
 create policy "listing_photos_select_own" on public.listing_photos for select
   using (
     exists (select 1 from public.listings l where l.id = listing_photos.listing_id and l.seller_id = auth.uid())
+  );
+
+-- Buyer/seller in order flow can read photos for reserved/sold listing
+create policy "listing_photos_select_order_participant" on public.listing_photos for select
+  using (
+    exists (
+      select 1
+      from public.orders o
+      where o.listing_id = listing_photos.listing_id
+        and (o.buyer_id = auth.uid() or o.seller_id = auth.uid())
+    )
   );
 
 -- Owner can insert/update/delete photos for own listings
@@ -223,7 +260,19 @@ alter table public.reviews enable row level security;
 create policy "reviews_select_all" on public.reviews for select using (true);
 
 create policy "reviews_insert_own" on public.reviews for insert
-  with check (reviewer_id = auth.uid());
+  with check (
+    reviewer_id = auth.uid()
+    and thread_id is not null
+    and exists (
+      select 1
+      from public.orders o
+      where o.thread_id = reviews.thread_id
+        and o.listing_id = reviews.listing_id
+        and o.buyer_id = auth.uid()
+        and o.seller_id = reviews.seller_id
+        and o.status = 'delivered'
+    )
+  );
 
 -- =============================================================================
 -- Thread deal confirmations — participants read; listing = only seller can insert; all participants can update own (upsert)
@@ -261,6 +310,49 @@ create policy "thread_deal_confirmations_insert_own" on public.thread_deal_confi
 create policy "thread_deal_confirmations_update_own" on public.thread_deal_confirmations for update
   using (user_id = auth.uid())
   with check (user_id = auth.uid());
+
+-- =============================================================================
+-- Orders — only buyer/seller can read; role-limited updates
+-- =============================================================================
+alter table public.orders enable row level security;
+
+create policy "orders_select_participants" on public.orders for select
+  using (buyer_id = auth.uid() or seller_id = auth.uid());
+
+create policy "orders_insert_seller" on public.orders for insert
+  with check (
+    seller_id = auth.uid()
+    and status in ('negotiating', 'price_accepted', 'cancelled')
+    and exists (
+      select 1
+      from public.threads t
+      where t.id = orders.thread_id
+        and t.context_type = 'listing'
+        and t.listing_id = orders.listing_id
+        and (t.user1_id = orders.buyer_id or t.user2_id = orders.buyer_id)
+        and (t.user1_id = orders.seller_id or t.user2_id = orders.seller_id)
+    )
+    and exists (
+      select 1
+      from public.listings l
+      where l.id = orders.listing_id
+        and l.seller_id = auth.uid()
+    )
+  );
+
+create policy "orders_update_buyer" on public.orders for update
+  using (buyer_id = auth.uid())
+  with check (
+    buyer_id = auth.uid()
+    and status in ('address_provided', 'delivered', 'cancelled')
+  );
+
+create policy "orders_update_seller" on public.orders for update
+  using (seller_id = auth.uid())
+  with check (
+    seller_id = auth.uid()
+    and status in ('price_accepted', 'shipped', 'cancelled')
+  );
 
 -- =============================================================================
 -- Reports — user can create; moderators can read all

@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 type ListingGridProps = {
   listings: ListingCard[];
   className?: string;
+  emptyText?: string;
 };
 
 function ListingCardCell({ listing }: { listing: ListingCard }) {
@@ -51,11 +52,15 @@ function ListingCardCell({ listing }: { listing: ListingCard }) {
   );
 }
 
-export function ListingGrid({ listings, className }: ListingGridProps) {
+export function ListingGrid({
+  listings,
+  className,
+  emptyText = "Tento používateľ nemá žiadne aktívne inzeráty.",
+}: ListingGridProps) {
   if (listings.length === 0) {
     return (
       <p className="text-muted-foreground text-sm">
-        Tento používateľ nemá žiadne aktívne inzeráty.
+        {emptyText}
       </p>
     );
   }

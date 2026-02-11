@@ -53,10 +53,19 @@ export function SignupScreen({ nextPath }: SignupScreenProps) {
     setMessage(null);
 
     const supabase = createSupabaseBrowserClient();
+    const appOrigin =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : (process.env.NEXT_PUBLIC_APP_URL ?? "");
+    const emailRedirectTo = appOrigin ? `${appOrigin}/auth/callback` : undefined;
+
     const { data, error: signUpError } = await supabase.auth.signUp({
       email: emailTrimmed.toLowerCase(),
       password,
-      options: { data: { full_name: nameTrimmed } },
+      options: {
+        data: { full_name: nameTrimmed },
+        ...(emailRedirectTo && { emailRedirectTo }),
+      },
     });
 
     if (signUpError) {

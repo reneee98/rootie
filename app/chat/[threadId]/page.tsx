@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { requireUser } from "@/lib/auth";
 import { getThreadDetail, getMessages } from "@/lib/data/chat";
+import { getThreadOrder, getProfileShippingAddress } from "@/lib/data/orders";
 import {
   getThreadDealState,
   getReviewEligibility,
@@ -16,10 +17,11 @@ export default async function ChatThreadPage({ params }: ChatThreadPageProps) {
   const { threadId } = await params;
   const user = await requireUser(`/chat/${threadId}`);
 
-  const [thread, { messages, hasMore }, dealState] = await Promise.all([
+  const [thread, { messages, hasMore }, dealState, orderState] = await Promise.all([
     getThreadDetail(threadId, user.id),
     getMessages(threadId, user.id),
     getThreadDealState(threadId, user.id),
+    getThreadOrder(threadId),
   ]);
 
   if (!thread) {
@@ -34,6 +36,8 @@ export default async function ChatThreadPage({ params }: ChatThreadPageProps) {
     null;
   let listingSellerId: string | null = null;
   let hasBuyerReviewed: boolean | null = null;
+  let buyerDefaultShippingAddress: Awaited<ReturnType<typeof getProfileShippingAddress>> | null =
+    null;
   if (thread.context_type === "listing" && thread.listing_id) {
     const { createSupabaseServerClient } = await import("@/lib/supabaseClient");
     const supabase = await createSupabaseServerClient();
@@ -50,6 +54,7 @@ export default async function ChatThreadPage({ params }: ChatThreadPageProps) {
         user.id,
         listingSellerId
       );
+      buyerDefaultShippingAddress = await getProfileShippingAddress(user.id);
     }
     if (listingSellerId && listingSellerId === user.id) {
       const buyerId =
@@ -65,6 +70,8 @@ export default async function ChatThreadPage({ params }: ChatThreadPageProps) {
       initialHasMore={hasMore}
       currentUserId={user.id}
       dealState={dealState ?? undefined}
+      orderState={orderState ?? undefined}
+      buyerDefaultShippingAddress={buyerDefaultShippingAddress ?? undefined}
       reviewEligibility={reviewEligibility ?? undefined}
       listingSellerId={listingSellerId ?? undefined}
       hasBuyerReviewed={hasBuyerReviewed ?? undefined}

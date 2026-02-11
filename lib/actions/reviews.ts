@@ -93,6 +93,16 @@ export type ConfirmOrderDeliveredResult =
   | { ok: true }
   | { ok: false; error: string };
 
+function isMissingThreadOrderDeliveredAtColumnError(
+  error: { code?: string; message?: string } | null
+): boolean {
+  if (!error) return false;
+
+  const isMissingColumnCode =
+    error.code === "42703" || error.code === "PGRST204";
+  return isMissingColumnCode && (error.message ?? "").includes("order_delivered_at");
+}
+
 /**
  * Buyer confirms that the order was delivered. Only buyer (non-seller) in a listing thread
  * can confirm; deal must already be confirmed. Idempotent.
@@ -147,7 +157,7 @@ export async function confirmOrderDelivered(
     })
     .eq("id", threadId);
 
-  if (updateErr) {
+  if (updateErr && !isMissingThreadOrderDeliveredAtColumnError(updateErr)) {
     return { ok: false, error: updateErr.message };
   }
 

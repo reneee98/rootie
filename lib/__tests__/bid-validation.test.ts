@@ -42,6 +42,7 @@ describe("validateBid", () => {
       auctionEndsAt: futureEnd,
     });
     expect(r.valid).toBe(false);
+    if (r.valid) throw new Error("Expected invalid result");
     expect(r.error).toContain("Minimálna ponuka");
     expect(r.minBid).toBe(10);
   });
@@ -79,6 +80,7 @@ describe("validateBid", () => {
       auctionEndsAt: pastEnd,
     });
     expect(r.valid).toBe(false);
+    if (r.valid) throw new Error("Expected invalid result");
     expect(r.error).toContain("skončila");
   });
 

@@ -91,3 +91,78 @@ export async function syncPhoneVerifiedFromAuth(): Promise<UpdatePhoneResult> {
   revalidatePath("/inbox");
   return { ok: true };
 }
+
+export type UpdateDefaultShippingAddressResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+type ShippingAddressInput = {
+  name: string;
+  street: string;
+  city: string;
+  zip: string;
+  country: string;
+  phone?: string | null;
+};
+
+function normalizeShippingAddressInput(
+  input: ShippingAddressInput
+): ShippingAddressInput | null {
+  const name = input.name.trim();
+  const street = input.street.trim();
+  const city = input.city.trim();
+  const zip = input.zip.trim();
+  const country = input.country.trim();
+  const phone = input.phone?.trim() || null;
+
+  if (!name || !street || !city || !zip || !country) {
+    return null;
+  }
+
+  return {
+    name,
+    street,
+    city,
+    zip,
+    country,
+    phone,
+  };
+}
+
+export async function updateDefaultShippingAddress(
+  input: ShippingAddressInput
+): Promise<UpdateDefaultShippingAddressResult> {
+  const user = await getUser();
+  if (!user) {
+    return { ok: false, error: "Nie ste prihlásený" };
+  }
+
+  const normalized = normalizeShippingAddressInput(input);
+  if (!normalized) {
+    return { ok: false, error: "Vyplňte všetky povinné polia adresy." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("profile_shipping_addresses")
+    .upsert(
+      {
+        user_id: user.id,
+        name: normalized.name,
+        street: normalized.street,
+        city: normalized.city,
+        zip: normalized.zip,
+        country: normalized.country,
+        phone: normalized.phone ?? null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" }
+    );
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/me");
+  return { ok: true };
+}

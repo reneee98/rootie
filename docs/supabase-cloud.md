@@ -81,6 +81,7 @@ Storage bucket a politiky sú v migrácii `20260209100003_storage_policies.sql`.
 
 - **„Missing Supabase server environment variables”** — skontroluj, že v `.env.local` máš vyplnené `NEXT_PUBLIC_SUPABASE_URL` a `NEXT_PUBLIC_SUPABASE_ANON_KEY` (a po reštarte dev servera).
 - **Auth nefunguje** — v Supabase **Authentication → URL Configuration** pridaj **Site URL** a **Redirect URLs** (napr. `http://localhost:3000`, prípadne produkčnú doménu).
+- **Potvrdzovací e-mail smeruje na localhost** — v **Authentication → [URL Configuration](https://supabase.com/dashboard/project/infzbcbstyxamxlotqdo/auth/url-configuration)** nastav **Site URL** na `https://rootie.vercel.app` a do **Redirect URLs** pridaj `https://rootie.vercel.app/auth/callback`. Alternatíva: spusti `SUPABASE_ACCESS_TOKEN=tvoj_pat node scripts/supabase-set-redirect-url.mjs` (PAT z [Account → Tokens](https://supabase.com/dashboard/account/tokens)).
 - **RLS / permission denied** — migrácie musia byť spustené v poradí; RLS je v `20260209100001_rls.sql` a ďalších.
 
 Ak budeš nasadzovať na Vercel, pridaj rovnaké premenné do **Vercel → Project → Settings → Environment Variables** (bez `.env.local`).

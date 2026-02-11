@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { ChevronLeft, ShieldCheck, MoreVertical, Ban, Flag } from "lucide-react";
+import { ChevronLeft, ShieldCheck, MoreVertical, Ban, Flag, Package2 } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,7 +71,7 @@ export function ChatHeader({ thread }: ChatHeaderProps) {
       <div className="flex h-14 items-center gap-2 px-2">
         <Link
           href="/inbox"
-          className="text-muted-foreground hover:text-foreground flex size-10 items-center justify-center rounded-full transition-colors"
+          className="text-muted-foreground hover:text-foreground flex size-11 items-center justify-center rounded-full transition-colors"
           aria-label="Späť do správ"
         >
           <ChevronLeft className="size-5" />
@@ -118,7 +118,7 @@ export function ChatHeader({ thread }: ChatHeaderProps) {
               <div className="border-input bg-background absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border py-1 shadow-lg">
                 <button
                   type="button"
-                  className="hover:bg-muted flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                  className="hover:bg-muted flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm"
                   onClick={handleBlock}
                   disabled={blocking}
                 >
@@ -127,7 +127,7 @@ export function ChatHeader({ thread }: ChatHeaderProps) {
                 </button>
                 <button
                   type="button"
-                  className="hover:bg-muted flex w-full items-center gap-2 px-3 py-2 text-left text-sm"
+                  className="hover:bg-muted flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm"
                   onClick={() => {
                     setMenuOpen(false);
                     setReportOpen(true);
@@ -194,18 +194,23 @@ export function ChatHeader({ thread }: ChatHeaderProps) {
       {thread.context_card.type !== "direct" && (
         <Link
           href={thread.context_card.href}
-          className="border-t bg-muted/30 flex items-center gap-3 px-4 py-2 transition-colors hover:bg-muted/50"
+          className="border-t bg-muted/30 flex min-h-14 items-center gap-3 px-4 py-2 transition-colors hover:bg-muted/50"
         >
-          {thread.context_card.type === "listing" &&
-            thread.context_card.image_url && (
-              <div className="size-10 shrink-0 overflow-hidden rounded bg-muted">
+          {thread.context_card.type === "listing" && (
+            <div className="size-11 shrink-0 overflow-hidden rounded bg-muted">
+              {thread.context_card.image_url ? (
                 <img
                   src={thread.context_card.image_url}
                   alt=""
                   className="size-full object-cover"
                 />
-              </div>
-            )}
+              ) : (
+                <div className="text-muted-foreground flex size-full items-center justify-center">
+                  <Package2 className="size-4" aria-hidden />
+                </div>
+              )}
+            </div>
+          )}
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-medium">
               {thread.context_card.type === "listing"

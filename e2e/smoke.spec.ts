@@ -13,15 +13,17 @@ test.describe("Smoke flow", () => {
   }) => {
     await test.step("Login as seller (predajca)", async () => {
       await page.goto("/login");
-      await page.getByPlaceholder("Email").fill(PREDAJCA_EMAIL);
-      await page.getByPlaceholder("Password").fill(PREDAJCA_PASSWORD);
-      await page.getByRole("button", { name: "Log in" }).click();
+      await page.getByPlaceholder("vas@email.sk").fill(PREDAJCA_EMAIL);
+      await page.getByPlaceholder("••••••••").fill(PREDAJCA_PASSWORD);
+      await page.getByRole("button", { name: "Prihlásiť sa" }).click();
       await expect(page).toHaveURL(/\/(me|$)/);
     });
 
     await test.step("Create listing", async () => {
       await page.goto("/create");
-      await expect(page.getByText(/Typ predaja|Nový inzerát/)).toBeVisible();
+      await expect(
+        page.getByRole("heading", { name: "Nový inzerát" })
+      ).toBeVisible();
 
       await page.getByRole("button", { name: "Ďalej" }).click();
 
@@ -48,15 +50,15 @@ test.describe("Smoke flow", () => {
       await page.goto("/me");
       await page.getByRole("button", { name: "Sign out" }).click();
       await page.goto("/login");
-      await page.getByPlaceholder("Email").fill(KUPUJUCI_EMAIL);
-      await page.getByPlaceholder("Password").fill(KUPUJUCI_PASSWORD);
-      await page.getByRole("button", { name: "Log in" }).click();
+      await page.getByPlaceholder("vas@email.sk").fill(KUPUJUCI_EMAIL);
+      await page.getByPlaceholder("••••••••").fill(KUPUJUCI_PASSWORD);
+      await page.getByRole("button", { name: "Prihlásiť sa" }).click();
       await expect(page).toHaveURL(/\/(me|$)/);
     });
 
     await test.step("Open listing and start chat", async () => {
       await page.goto(listingUrl);
-      await page.getByRole("button", { name: /Reagovať na ponuku/ }).click();
+      await page.getByRole("button", { name: "Napísať predajcovi" }).click();
       await expect(page).toHaveURL(/\/chat\/[a-f0-9-]+/);
     });
 
@@ -89,9 +91,9 @@ test.describe("Smoke flow", () => {
       await page.goto("/me");
       await page.getByRole("button", { name: "Sign out" }).click();
       await page.goto("/login");
-      await page.getByPlaceholder("Email").fill(DRUHY_EMAIL);
-      await page.getByPlaceholder("Password").fill(DRUHY_PASSWORD);
-      await page.getByRole("button", { name: "Log in" }).click();
+      await page.getByPlaceholder("vas@email.sk").fill(DRUHY_EMAIL);
+      await page.getByPlaceholder("••••••••").fill(DRUHY_PASSWORD);
+      await page.getByRole("button", { name: "Prihlásiť sa" }).click();
     });
 
     await test.step("Open wanted and send offer", async () => {

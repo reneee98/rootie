@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
+import type { OrderStatus } from "@/lib/data/orders";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -13,8 +14,8 @@ export type InboxThreadPreview = {
   last_message_preview: string | null;
   last_message_sender_id: string | null;
   unread_count: number;
-  /** Set for listing threads when buyer confirmed "Objednávka doručená" */
-  order_delivered_at: string | null;
+  /** Listing order status for thread, when order exists. */
+  order_status: OrderStatus | null;
   other_user: {
     id: string;
     display_name: string | null;
@@ -36,23 +37,65 @@ export async function getInboxThreads(
 ): Promise<InboxThreadPreview[]> {
   const supabase = await createSupabaseServerClient();
 
-  const { data: threads, error } = await supabase
-    .from("threads")
-    .select(
-      `id, context_type, listing_id, wanted_request_id, user1_id, user2_id, last_message_at, order_delivered_at`
-    )
-    .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
-    .order("last_message_at", { ascending: false, nullsFirst: false })
-    .limit(100);
+  type ThreadRow = {
+    id: string;
+    context_type: ThreadContextType;
+    listing_id: string | null;
+    wanted_request_id: string | null;
+    user1_id: string;
+    user2_id: string;
+    last_message_at?: string | null;
+    created_at?: string | null;
+  };
 
-  if (error || !threads?.length) return [];
+  const runThreadsQuery = async (
+    selectClause: string,
+    orderBy: "last_message_at" | "created_at"
+  ) =>
+    supabase
+      .from("threads")
+      .select(selectClause)
+      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+      .order(orderBy, { ascending: false, nullsFirst: false })
+      .limit(100);
+
+  const isMissingColumnError = (
+    e: { code?: string; message?: string } | null,
+    columnName: string
+  ) => e?.code === "42703" && (e.message ?? "").includes(columnName);
+
+  let hasLastMessageAtColumn = true;
+
+  const withAllColumns =
+    "id, context_type, listing_id, wanted_request_id, user1_id, user2_id, last_message_at";
+  const fallbackColumns =
+    "id, context_type, listing_id, wanted_request_id, user1_id, user2_id, created_at";
+
+  let { data: threadsRaw, error } = await runThreadsQuery(
+    withAllColumns,
+    "last_message_at"
+  );
+
+  if (isMissingColumnError(error, "last_message_at")) {
+    hasLastMessageAtColumn = false;
+    const retry = await runThreadsQuery(fallbackColumns, "created_at");
+    threadsRaw = retry.data;
+    error = retry.error;
+  }
+
+  if (error) {
+    console.error("getInboxThreads error:", error);
+    return [];
+  }
+  const threads = (threadsRaw ?? []) as unknown as ThreadRow[];
+  if (!threads?.length) return [];
 
   const threadIds = threads.map((t) => t.id);
   const otherUserIds = threads.map((t) =>
     t.user1_id === userId ? t.user2_id : t.user1_id
   );
 
-  const [lastMessagesRes, readsRes, profilesRes, listingsRes, wantedsRes] =
+  const [lastMessagesRes, readsRes, profilesRes, listingsRes, wantedsRes, ordersRes] =
     await Promise.all([
       supabase
         .from("messages")
@@ -86,7 +129,20 @@ export async function getInboxThreads(
               threads.map((t) => t.wanted_request_id).filter(Boolean) as string[]
             )
         : Promise.resolve({ data: [] }),
+      supabase
+        .from("orders")
+        .select("thread_id, status")
+        .in("thread_id", threadIds),
     ]);
+
+  const orderStatusByThread = new Map<string, OrderStatus>();
+  if (!ordersRes.error) {
+    for (const o of ordersRes.data ?? []) {
+      orderStatusByThread.set(o.thread_id, o.status as OrderStatus);
+    }
+  } else if (ordersRes.error.code !== "42P01") {
+    console.error("getInboxThreads orders error:", ordersRes.error);
+  }
 
   const firstMessagePerThread = new Map<string, { body: string; sender_id: string; created_at: string }>();
   for (const m of lastMessagesRes.data ?? []) {
@@ -216,8 +272,10 @@ export async function getInboxThreads(
     result.push({
       id: t.id,
       context_type: t.context_type as ThreadContextType,
-      last_message_at: t.last_message_at ?? null,
-      order_delivered_at: t.order_delivered_at ?? null,
+      last_message_at: hasLastMessageAtColumn
+        ? (t.last_message_at ?? null)
+        : (lastMsg?.created_at ?? t.created_at ?? null),
+      order_status: orderStatusByThread.get(t.id) ?? null,
       last_message_preview: lastMsg
         ? (lastMsg.body.length > 60 ? lastMsg.body.slice(0, 60) + "…" : lastMsg.body)
         : null,
@@ -229,6 +287,81 @@ export async function getInboxThreads(
   }
 
   return result;
+}
+
+/**
+ * Lightweight unread indicator for global UI (e.g. bottom nav red dot).
+ * Returns true when at least one thread has a newer message from the other user.
+ */
+export async function getHasUnreadInbox(userId: string): Promise<boolean> {
+  const supabase = await createSupabaseServerClient();
+
+  const { data: threads, error: threadsError } = await supabase
+    .from("threads")
+    .select("id")
+    .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+    .limit(100);
+
+  if (threadsError) {
+    console.error("getHasUnreadInbox threads error:", threadsError);
+    return false;
+  }
+
+  const threadIds = (threads ?? []).map((t) => t.id);
+  if (threadIds.length === 0) return false;
+
+  const [messagesRes, readsRes] = await Promise.all([
+    supabase
+      .from("messages")
+      .select("thread_id, sender_id, created_at")
+      .in("thread_id", threadIds)
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("thread_reads")
+      .select("thread_id, last_read_at")
+      .eq("user_id", userId)
+      .in("thread_id", threadIds),
+  ]);
+
+  if (messagesRes.error) {
+    console.error("getHasUnreadInbox messages error:", messagesRes.error);
+    return false;
+  }
+
+  if (readsRes.error) {
+    console.error("getHasUnreadInbox reads error:", readsRes.error);
+    return false;
+  }
+
+  const newestMessageByThread = new Map<
+    string,
+    { sender_id: string; created_at: string }
+  >();
+  for (const m of messagesRes.data ?? []) {
+    if (!newestMessageByThread.has(m.thread_id)) {
+      newestMessageByThread.set(m.thread_id, {
+        sender_id: m.sender_id,
+        created_at: m.created_at,
+      });
+    }
+  }
+
+  const readMap = new Map<string, string>();
+  for (const r of readsRes.data ?? []) {
+    readMap.set(r.thread_id, r.last_read_at);
+  }
+
+  for (const threadId of threadIds) {
+    const newest = newestMessageByThread.get(threadId);
+    if (!newest) continue;
+    if (newest.sender_id === userId) continue;
+
+    const lastReadAt = readMap.get(threadId);
+    if (!lastReadAt) return true;
+    if (Date.parse(newest.created_at) > Date.parse(lastReadAt)) return true;
+  }
+
+  return false;
 }
 
 async function countUnread(

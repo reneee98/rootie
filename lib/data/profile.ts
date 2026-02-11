@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
+import { PUBLIC_LISTING_STATUS } from "@/lib/listing-lifecycle";
 
 export type ProfilePublic = {
   id: string;
@@ -62,7 +63,7 @@ export async function getActiveListingsBySeller(
     .from("listings")
     .select("id, plant_name, type, fixed_price, auction_start_price")
     .eq("seller_id", sellerId)
-    .eq("status", "active")
+    .eq("status", PUBLIC_LISTING_STATUS)
     .order("created_at", { ascending: false });
 
   if (listingsError || !listings?.length) {
