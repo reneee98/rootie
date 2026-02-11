@@ -18,6 +18,7 @@ import { ListingCtaBar } from "@/components/listing/listing-cta-bar";
 import { getListingDetail } from "@/lib/data/listings";
 import { getUser } from "@/lib/auth";
 import { getRegionShortLabel } from "@/lib/regions";
+import { createSupabaseServerClient } from "@/lib/supabaseClient";
 
 type ListingPageProps = {
   params: Promise<{ id: string }>;
@@ -37,6 +38,21 @@ export default async function ListingPage({ params }: ListingPageProps) {
   const isFixed = listing.type === "fixed";
   const isReserved = listing.status === "reserved";
   const isSold = listing.status === "sold";
+  let isAuctionWinner = false;
+
+  if (!isFixed && currentUser) {
+    const supabase = await createSupabaseServerClient();
+    const { data: topBid } = await supabase
+      .from("bids")
+      .select("bidder_id")
+      .eq("listing_id", listing.id)
+      .order("amount", { ascending: false })
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    isAuctionWinner = listing.status === "sold" && topBid?.bidder_id === currentUser.id;
+  }
 
   const auctionEnded = !isFixed && listing.status === "expired";
 
@@ -155,8 +171,7 @@ export default async function ListingPage({ params }: ListingPageProps) {
         isAuction={!isFixed}
         auctionEnded={auctionEnded}
         status={listing.status}
-        isSaved={listing.is_saved}
-        swapEnabled={listing.swap_enabled}
+        isAuctionWinner={isAuctionWinner}
         auctionStartPrice={listing.auction_start_price ?? undefined}
         auctionMinIncrement={listing.auction_min_increment ?? undefined}
         auctionEndsAt={listing.auction_ends_at}

@@ -32,8 +32,12 @@ function parseSearchParams(
     const v = raw[key];
     return typeof v === "string" ? v : undefined;
   };
+  const regionRaw = str("region");
   return {
-    region: str("region") || "All Slovakia",
+    region:
+      regionRaw && regionRaw !== "All Slovakia"
+        ? regionRaw
+        : undefined,
     query: str("q"),
     intent: (str("intent") as WantedFeedFiltersType["intent"]) ?? undefined,
     page: str("page") ? Number(str("page")) : 1,

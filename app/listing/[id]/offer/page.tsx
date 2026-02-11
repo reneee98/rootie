@@ -7,6 +7,7 @@ import { getListingThreadIdIfExists } from "@/lib/actions/listing-thread";
 import { createListingThreadWithOffer } from "@/lib/actions/listing-thread";
 import { OfferForm } from "@/components/offers/offer-form";
 import { Button } from "@/components/ui/button";
+import { createSupabaseServerClient } from "@/lib/supabaseClient";
 
 type ListingOfferPageProps = {
   params: Promise<{ id: string }>;
@@ -37,7 +38,18 @@ export default async function ListingOfferPage({
 
   const existingThreadId = await getListingThreadIdIfExists(id, currentUser.id);
   if (existingThreadId) {
-    redirect(`/chat/${existingThreadId}`);
+    const supabase = await createSupabaseServerClient();
+    const { data: existingOffers } = await supabase
+      .from("messages")
+      .select("id")
+      .eq("thread_id", existingThreadId)
+      .eq("sender_id", currentUser.id)
+      .in("message_type", ["offer_price", "offer_swap"])
+      .limit(1);
+
+    if (existingOffers?.length) {
+      redirect(`/chat/${existingThreadId}`);
+    }
   }
 
   return (

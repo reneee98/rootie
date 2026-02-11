@@ -22,7 +22,7 @@ export async function getOrCreateListingThread(listingId: string) {
   // Get listing to find seller
   const { data: listing } = await supabase
     .from("listings")
-    .select("id, seller_id")
+    .select("id, seller_id, type, status")
     .eq("id", listingId)
     .single();
 
@@ -32,6 +32,25 @@ export async function getOrCreateListingThread(listingId: string) {
 
   if (listing.seller_id === user.id) {
     redirect(`/listing/${listingId}`);
+  }
+
+  if (listing.type === "auction") {
+    if (listing.status !== "sold") {
+      redirect(`/listing/${listingId}`);
+    }
+
+    const { data: winningBid } = await supabase
+      .from("bids")
+      .select("bidder_id")
+      .eq("listing_id", listingId)
+      .order("amount", { ascending: false })
+      .order("created_at", { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!winningBid || winningBid.bidder_id !== user.id) {
+      redirect(`/listing/${listingId}`);
+    }
   }
 
   const currentId = user.id;
@@ -133,12 +152,18 @@ export async function createListingThreadWithOffer(
 
   const { data: listing } = await supabase
     .from("listings")
-    .select("id, seller_id")
+    .select("id, seller_id, type, status")
     .eq("id", listingId)
     .single();
 
   if (!listing) return { ok: false, error: "Inzerát neexistuje." };
   if (listing.seller_id === user.id) return { ok: false, error: "Nemôžete reagovať na vlastný inzerát." };
+  if (listing.type === "auction") {
+    return { ok: false, error: "Pri aukcii sa nedá posielať ponuka cez chat. Použite príhoz." };
+  }
+  if (listing.status !== "active") {
+    return { ok: false, error: "Na tento inzerát už nie je možné poslať ponuku." };
+  }
 
   const [user1Id, user2Id] =
     user.id < listing.seller_id
@@ -184,32 +209,29 @@ export async function createListingThreadWithOffer(
     threadId = inserted.id;
   }
 
-  const isNewThread = !existing;
-  if (isNewThread) {
-    const body = offerType === "price"
-      ? String(amount!.toFixed(2))
-      : (swapBody ?? "").trim() || "Ponúkam výmenu.";
-    const messageType = offerType === "price" ? "offer_price" : "offer_swap";
-    const metadata =
-      offerType === "price"
-        ? { amount_eur: amount! }
-        : { swap_for_text: body };
+  const body = offerType === "price"
+    ? String(amount!.toFixed(2))
+    : (swapBody ?? "").trim() || "Ponúkam výmenu.";
+  const messageType = offerType === "price" ? "offer_price" : "offer_swap";
+  const metadata =
+    offerType === "price"
+      ? { amount_eur: amount! }
+      : { swap_for_text: body };
 
-    const { error: msgErr } = await supabase.from("messages").insert({
-      thread_id: threadId,
-      sender_id: user.id,
-      body,
-      message_type: messageType,
-      metadata,
-      attachments: [],
-    });
+  const { error: msgErr } = await supabase.from("messages").insert({
+    thread_id: threadId,
+    sender_id: user.id,
+    body,
+    message_type: messageType,
+    metadata,
+    attachments: [],
+  });
 
-    if (msgErr) {
-      return { ok: false, error: "Konverzácia bola vytvorená, ale ponuka sa neodoslala. Skúste napísať v chate." };
-    }
-    revalidatePath("/inbox");
-    revalidatePath(`/chat/${threadId}`);
+  if (msgErr) {
+    return { ok: false, error: "Ponuku sa nepodarilo odoslať. Skúste to znova." };
   }
+  revalidatePath("/inbox");
+  revalidatePath(`/chat/${threadId}`);
 
   return { ok: true, threadId };
 }

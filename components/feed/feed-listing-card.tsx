@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import Link from "next/link";
-import { ArrowLeftRight, BadgeCheck, ImageOff, ShieldCheck } from "lucide-react";
+import { ArrowLeftRight, ImageOff, ShieldCheck, Star } from "lucide-react";
 
 import type { FeedListingCard } from "@/lib/data/listings";
 import { formatPrice } from "@/lib/formatters";
@@ -31,9 +31,9 @@ function getSellerShortName(displayName: string | null | undefined): string {
 }
 
 function formatRating(avg: number | null, count: number): string {
-  if (avg == null || Number.isNaN(avg)) return "⭐ Nový";
+  if (avg == null || Number.isNaN(avg)) return "Nový";
   const rating = avg.toFixed(1).replace(".", ",");
-  return `⭐ ${rating} (${count})`;
+  return `${rating} (${count})`;
 }
 
 function getAuctionPrice(listing: FeedListingCard): string {
@@ -178,26 +178,20 @@ export function FeedListingCardComponent({
 
           <div className="min-w-0 flex-1">
             <p className="truncate text-[11px] font-medium">{sellerName}</p>
-            <p className="text-muted-foreground truncate text-[10px]">
-              {formatRating(listing.seller_ratings_avg, listing.seller_ratings_count)}
+            <p className="text-muted-foreground flex items-center gap-1 text-[10px]">
+              <Star className="size-3 shrink-0" aria-hidden />
+              <span className="truncate">
+                {formatRating(listing.seller_ratings_avg, listing.seller_ratings_count)}
+              </span>
             </p>
           </div>
 
-          <span
-            className={cn(
-              "inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-medium",
-              listing.seller_phone_verified
-                ? "border-primary/30 bg-primary/10 text-primary"
-                : "border-border text-muted-foreground"
-            )}
-          >
-            {listing.seller_phone_verified ? (
+          {listing.seller_phone_verified ? (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2 py-1 text-[10px] font-medium text-primary">
               <ShieldCheck className="size-3" aria-hidden />
-            ) : (
-              <BadgeCheck className="size-3" aria-hidden />
-            )}
-            {listing.seller_phone_verified ? "Overený telefón" : "Neoverený"}
-          </span>
+              Overený telefón
+            </span>
+          ) : null}
         </div>
       </div>
     </Link>

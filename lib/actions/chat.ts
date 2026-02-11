@@ -107,13 +107,48 @@ export async function sendMessage(
   const attachments = sanitizeAttachments(input.attachments);
 
   let listingSellerId: string | null = null;
+  let listingType: "fixed" | "auction" | null = null;
+  let listingStatus: string | null = null;
+  let listingBuyerId: string | null = null;
+  let listingWinningBidderId: string | null = null;
+  let buyerHasOfferInThread = false;
+
   if (thread.context_type === "listing" && thread.listing_id) {
     const { data: listing } = await supabase
       .from("listings")
-      .select("seller_id")
+      .select("seller_id, type, status")
       .eq("id", thread.listing_id)
       .maybeSingle();
     listingSellerId = listing?.seller_id ?? null;
+    listingType =
+      listing?.type === "fixed" || listing?.type === "auction"
+        ? (listing.type as "fixed" | "auction")
+        : null;
+    listingStatus = typeof listing?.status === "string" ? listing.status : null;
+
+    if (listingSellerId) {
+      listingBuyerId =
+        thread.user1_id === listingSellerId ? thread.user2_id : thread.user1_id;
+      const { data: buyerOfferRows } = await supabase
+        .from("messages")
+        .select("id")
+        .eq("thread_id", threadId)
+        .eq("sender_id", listingBuyerId)
+        .in("message_type", ["offer_price", "offer_swap"])
+        .limit(1);
+      buyerHasOfferInThread = Boolean(buyerOfferRows?.length);
+    }
+
+    if (listingType === "auction" && listingStatus === "sold") {
+      const { data: winningRows } = await supabase
+        .from("bids")
+        .select("bidder_id")
+        .eq("listing_id", thread.listing_id)
+        .order("amount", { ascending: false })
+        .order("created_at", { ascending: true })
+        .limit(1);
+      listingWinningBidderId = winningRows?.[0]?.bidder_id ?? null;
+    }
   }
 
   const isListingThread = thread.context_type === "listing";
@@ -124,17 +159,42 @@ export async function sendMessage(
     isListingThread && listingSellerId && listingSellerId !== user.id
   );
 
+  const canSendRegularListingMessage = (() => {
+    if (!isListingThread || !listingSellerId || !listingType) return true;
+
+    if (listingType === "auction") {
+      const participantsMatchWinner =
+        Boolean(listingWinningBidderId) &&
+        listingWinningBidderId === listingBuyerId;
+      return listingStatus === "sold" && participantsMatchWinner;
+    }
+
+    return buyerHasOfferInThread;
+  })();
+
   let normalizedBody = body;
   let normalizedMetadata: Record<string, unknown> = {};
   let normalizedAttachments = attachments;
 
   if (messageType === "text") {
+    if (isListingThread && !canSendRegularListingMessage) {
+      if (listingType === "auction") {
+        return { ok: false, error: "V aukcii môžete písať do chatu až po výhre aukcie." };
+      }
+      return {
+        ok: false,
+        error: "Do chatu môžete písať až po odoslaní ponuky (cena alebo výmena).",
+      };
+    }
     if (!body && attachments.length === 0) {
       return { ok: false, error: "Správa alebo príloha je povinná." };
     }
   } else if (messageType === "offer_price") {
     if (!isListingThread || !listingSellerId) {
       return { ok: false, error: "Ponuku ceny je možné poslať len v chate k inzerátu." };
+    }
+    if (listingType === "auction") {
+      return { ok: false, error: "V aukcii neodosielajte ponuku cez chat. Použite príhoz." };
     }
     const amount =
       parsePositiveAmount(metadata["amount_eur"]) ??
@@ -193,6 +253,9 @@ export async function sendMessage(
     if (!isBuyerInListingThread) {
       return { ok: false, error: "Ponuku výmeny môže v tomto chate poslať iba kupujúci." };
     }
+    if (listingType === "auction") {
+      return { ok: false, error: "V aukcii nie je možné posielať ponuku výmeny cez chat." };
+    }
 
     const swapForTextCandidate =
       typeof metadata["swap_for_text"] === "string"
@@ -218,6 +281,15 @@ export async function sendMessage(
   } else if (messageType === "system" || messageType === "order_status") {
     if (!isSellerInListingThread) {
       return { ok: false, error: "Takúto správu môže odoslať iba predajca." };
+    }
+    if (isListingThread && !canSendRegularListingMessage) {
+      if (listingType === "auction") {
+        return { ok: false, error: "V aukcii môžete písať do chatu až po výhre aukcie." };
+      }
+      return {
+        ok: false,
+        error: "Do chatu môžete písať až po odoslaní ponuky (cena alebo výmena).",
+      };
     }
     if (!body) {
       return { ok: false, error: "Text správy je povinný." };

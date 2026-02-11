@@ -35,18 +35,67 @@ export default async function ChatThreadPage({ params }: ChatThreadPageProps) {
   let reviewEligibility: Awaited<ReturnType<typeof getReviewEligibility>> | null =
     null;
   let listingSellerId: string | null = null;
+  let listingType: "fixed" | "auction" | null = null;
   let hasBuyerReviewed: boolean | null = null;
   let buyerDefaultShippingAddress: Awaited<ReturnType<typeof getProfileShippingAddress>> | null =
     null;
+  let canSendText = true;
+  let sendTextBlockedReason: string | null = null;
   if (thread.context_type === "listing" && thread.listing_id) {
     const { createSupabaseServerClient } = await import("@/lib/supabaseClient");
     const supabase = await createSupabaseServerClient();
     const { data: listing } = await supabase
       .from("listings")
-      .select("seller_id")
+      .select("seller_id, type, status")
       .eq("id", thread.listing_id)
       .single();
     listingSellerId = listing?.seller_id ?? null;
+    listingType =
+      listing?.type === "fixed" || listing?.type === "auction"
+        ? (listing.type as "fixed" | "auction")
+        : null;
+    const buyerId =
+      listingSellerId && thread.user1_id === listingSellerId
+        ? thread.user2_id
+        : listingSellerId
+          ? thread.user1_id
+          : null;
+
+    if (listingType === "fixed" && buyerId) {
+      const { data: offerRows } = await supabase
+        .from("messages")
+        .select("id")
+        .eq("thread_id", threadId)
+        .eq("sender_id", buyerId)
+        .in("message_type", ["offer_price", "offer_swap"])
+        .limit(1);
+
+      if (!offerRows?.length) {
+        canSendText = false;
+        sendTextBlockedReason =
+          "Do chatu môžete písať až po odoslaní ponuky (cena alebo výmena).";
+      }
+    }
+
+    if (listingType === "auction") {
+      const { data: winningRows } = await supabase
+        .from("bids")
+        .select("bidder_id")
+        .eq("listing_id", thread.listing_id)
+        .order("amount", { ascending: false })
+        .order("created_at", { ascending: true })
+        .limit(1);
+      const winnerId = winningRows?.[0]?.bidder_id ?? null;
+      const winnerMatchesParticipants =
+        Boolean(buyerId) && Boolean(winnerId) && buyerId === winnerId;
+      const sold = listing?.status === "sold";
+      canSendText = sold && winnerMatchesParticipants;
+      if (!canSendText) {
+        sendTextBlockedReason =
+          "V aukcii môžete písať do chatu až po výhre aukcie.";
+      }
+    }
+
     if (listingSellerId && listingSellerId !== user.id) {
       reviewEligibility = await getReviewEligibility(
         threadId,
@@ -74,6 +123,9 @@ export default async function ChatThreadPage({ params }: ChatThreadPageProps) {
       buyerDefaultShippingAddress={buyerDefaultShippingAddress ?? undefined}
       reviewEligibility={reviewEligibility ?? undefined}
       listingSellerId={listingSellerId ?? undefined}
+      listingType={listingType ?? undefined}
+      canSendText={canSendText}
+      sendTextBlockedReason={sendTextBlockedReason ?? undefined}
       hasBuyerReviewed={hasBuyerReviewed ?? undefined}
       isModeratorViewOnly={isModeratorViewOnly}
     />

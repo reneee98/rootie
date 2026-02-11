@@ -41,7 +41,7 @@ export function AuctionBidDrawer({
         <Button
           variant="secondary"
           size="sm"
-          className="min-h-11 gap-1.5"
+          className="min-h-11 w-full gap-1.5"
           aria-label="Pridať príhoz"
         >
           <Gavel className="size-4" aria-hidden />

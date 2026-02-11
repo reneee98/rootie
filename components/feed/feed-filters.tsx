@@ -14,10 +14,11 @@ import {
   Filter,
   MapPin,
   Search,
-  SlidersHorizontal,
   X,
 } from "lucide-react";
 
+import { searchPlantTaxa, type PlantTaxonResult } from "@/lib/actions/plant-search";
+import { PLANT_QUICK_CATEGORIES } from "@/lib/plant-quick-categories";
 import { SLOVAK_REGIONS, getRegionShortLabel } from "@/lib/regions";
 import { Button } from "@/components/ui/button";
 import { FilterChip } from "@/components/ui/filter-chip";
@@ -45,6 +46,13 @@ type FeedFiltersProps = {
 };
 
 const STORED_FILTERS_KEY = "rootie:domov-filtre:v1";
+const SEARCH_HISTORY_STORAGE_KEY = "rootie:search-history:v1";
+
+const POPULAR_TAXA = [
+  "Monstera deliciosa",
+  "Monstera adansonii",
+  "Hoya carnosa",
+] as const;
 
 const TYPE_OPTIONS: { value: HomeFeedType; label: string }[] = [
   { value: "all", label: "Všetko" },
@@ -73,6 +81,25 @@ const AUCTION_ENDS_OPTIONS = [
 
 const CONDITION_OPTIONS = ["Nová", "Pekný stav", "Potrebuje starostlivosť"] as const;
 const SIZE_OPTIONS = ["S", "M", "L"] as const;
+
+function normalizeSearchTerm(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function readSearchHistoryFromStorage() {
+  if (typeof window === "undefined") return [] as string[];
+  const raw = window.localStorage.getItem(SEARCH_HISTORY_STORAGE_KEY);
+  if (!raw) return [] as string[];
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [] as string[];
+    return parsed
+      .filter((item): item is string => typeof item === "string")
+      .slice(0, 8);
+  } catch {
+    return [] as string[];
+  }
+}
 
 function parseType(value: string | null): HomeFeedType {
   if (value === "fixed" || value === "auction") return value;
@@ -131,9 +158,10 @@ export function FeedFilters({ resultsCount }: FeedFiltersProps) {
   const [filterOpen, setFilterOpen] = useState(false);
   const [sortOpen, setSortOpen] = useState(false);
   const [regionOpen, setRegionOpen] = useState(false);
-  const [typePickerOpen, setTypePickerOpen] = useState(false);
 
   const restoreAttemptedRef = useRef(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
 
   const currentType = parseType(searchParams.get("type"));
   const currentSort = parseSort(searchParams.get("sort"), currentType);
@@ -166,6 +194,11 @@ export function FeedFilters({ resultsCount }: FeedFiltersProps) {
   const [draftMinPhotos, setDraftMinPhotos] = useState(currentMinPhotos);
   const [draftCondition, setDraftCondition] = useState(currentCondition);
   const [draftSize, setDraftSize] = useState(currentSize);
+  const [searchInput, setSearchInput] = useState(currentQuery);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchLoading, setSearchLoading] = useState(false);
+  const [searchResults, setSearchResults] = useState<PlantTaxonResult[]>([]);
+  const [searchHistory, setSearchHistory] = useState<string[]>(readSearchHistoryFromStorage);
 
   const activeFilterCount = useMemo(() => {
     const params = new URLSearchParams(searchParams.toString());
@@ -220,28 +253,78 @@ export function FeedFilters({ resultsCount }: FeedFiltersProps) {
     updateParams(Object.fromEntries(storedParams.entries()), { replace: true });
   }, [searchParams, updateParams]);
 
-  const openFullSearch = useCallback(() => {
-    const params = new URLSearchParams(searchParams.toString());
-    params.delete("page");
-    const qs = params.toString();
-    router.push(qs ? `/search?${qs}` : "/search");
-  }, [router, searchParams]);
+  useEffect(() => {
+    setSearchInput(currentQuery);
+  }, [currentQuery]);
+
+  useEffect(() => {
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target as Node | null;
+      if (!target || !searchContainerRef.current) return;
+      if (!searchContainerRef.current.contains(target)) {
+        setSearchOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    return () => document.removeEventListener("pointerdown", handlePointerDown);
+  }, []);
+
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+
+    const term = searchInput.trim();
+    if (term.length < 2) {
+      setSearchResults([]);
+      setSearchLoading(false);
+      return;
+    }
+
+    searchDebounceRef.current = setTimeout(() => {
+      setSearchLoading(true);
+      searchPlantTaxa(term)
+        .then((data) => setSearchResults(data))
+        .finally(() => setSearchLoading(false));
+    }, 240);
+
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [searchInput]);
+
+  const saveSearchToHistory = useCallback((value: string) => {
+    if (typeof window === "undefined") return;
+    const trimmed = value.trim();
+    if (!trimmed) return;
+
+    setSearchHistory((current) => {
+      const next = [
+        trimmed,
+        ...current.filter((item) => normalizeSearchTerm(item) !== normalizeSearchTerm(trimmed)),
+      ].slice(0, 8);
+      window.localStorage.setItem(SEARCH_HISTORY_STORAGE_KEY, JSON.stringify(next));
+      return next;
+    });
+  }, []);
+
+  const applySearch = useCallback(
+    (value: string) => {
+      const trimmed = value.trim();
+      setSearchInput(trimmed);
+      setSearchOpen(false);
+      if (trimmed) {
+        saveSearchToHistory(trimmed);
+      }
+      updateParams({ q: trimmed });
+    },
+    [saveSearchToHistory, updateParams]
+  );
 
   const clearSearch = useCallback(() => {
+    setSearchInput("");
+    setSearchOpen(false);
     updateParams({ q: "" });
   }, [updateParams]);
-
-  const setType = useCallback(
-    (nextType: HomeFeedType) => {
-      const nextSort = getDefaultSort(nextType);
-      updateParams({
-        type: nextType === "all" ? "" : nextType,
-        sort: nextSort === "newest" ? "" : nextSort,
-      });
-      setTypePickerOpen(false);
-    },
-    [updateParams]
-  );
 
   const openFilters = useCallback(() => {
     setDraftType(currentType);
@@ -387,30 +470,85 @@ export function FeedFilters({ resultsCount }: FeedFiltersProps) {
       ? `Zobraziť výsledky (${resultsCount})`
       : "Zobraziť výsledky";
 
+  const searchSuggestions = useMemo(() => {
+    const term = searchInput.trim();
+
+    if (term.length >= 2 && searchResults.length > 0) {
+      return searchResults.map((item) => item.canonical_name);
+    }
+
+    const base = [...searchHistory, ...POPULAR_TAXA];
+    const unique = Array.from(new Set(base));
+    if (!term) return unique.slice(0, 8);
+
+    return unique
+      .filter((item) => normalizeSearchTerm(item).includes(normalizeSearchTerm(term)))
+      .slice(0, 8);
+  }, [searchHistory, searchInput, searchResults]);
+
+  const showSearchSuggestions = searchOpen && (
+    searchInput.trim().length > 0 || searchHistory.length > 0 || POPULAR_TAXA.length > 0
+  );
+
   return (
     <div className="space-y-3" data-pending={isPending || undefined}>
       <div className="space-y-1.5">
-        <div className="border-input bg-background flex min-h-[44px] items-center rounded-full border px-3 py-1 shadow-sm">
-          <button
-            type="button"
-            onClick={openFullSearch}
-            className="flex min-h-[44px] flex-1 items-center gap-2 text-left"
-            aria-label="Otvoriť vyhľadávanie"
-          >
+        <div ref={searchContainerRef} className="relative">
+          <div className="border-input bg-background flex min-h-[44px] items-center rounded-full border px-3 py-1 shadow-sm">
             <Search className="text-muted-foreground size-4 shrink-0" aria-hidden />
-            <span className={cn("truncate text-sm", !currentQuery && "text-muted-foreground")}>
-              {currentQuery || "Hľadať rastlinu… (Monstera, Hoya, Alocasia)"}
-            </span>
-          </button>
-          {currentQuery ? (
-            <button
-              type="button"
-              onClick={clearSearch}
-              className="text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-full"
-              aria-label="Odstrániť vyhľadávanie"
-            >
-              <X className="size-4" aria-hidden />
-            </button>
+            <input
+              value={searchInput}
+              onFocus={() => setSearchOpen(true)}
+              onChange={(event) => {
+                setSearchInput(event.target.value);
+                setSearchOpen(true);
+              }}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  applySearch(searchInput);
+                }
+                if (event.key === "Escape") {
+                  setSearchOpen(false);
+                }
+              }}
+              placeholder="Hľadať rastlinu… (Monstera, Hoya, Alocasia)"
+              className="h-11 min-h-[44px] w-full bg-transparent px-2 text-sm outline-none"
+              aria-label="Hľadať rastlinu"
+            />
+            {searchInput ? (
+              <button
+                type="button"
+                onClick={clearSearch}
+                className="text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-full"
+                aria-label="Odstrániť vyhľadávanie"
+              >
+                <X className="size-4" aria-hidden />
+              </button>
+            ) : null}
+          </div>
+
+          {showSearchSuggestions ? (
+            <div className="border-input bg-background absolute z-20 mt-2 w-full rounded-2xl border p-2 shadow-lg">
+              {searchLoading ? (
+                <p className="text-muted-foreground px-2 py-2 text-xs">Hľadám návrhy…</p>
+              ) : searchSuggestions.length > 0 ? (
+                <div className="max-h-72 space-y-1 overflow-y-auto">
+                  {searchSuggestions.map((name) => (
+                    <button
+                      key={name}
+                      type="button"
+                      className="hover:bg-accent flex min-h-[42px] w-full items-center rounded-xl px-3 text-left text-sm"
+                      onClick={() => applySearch(name)}
+                    >
+                      {name}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-muted-foreground px-2 py-2 text-xs">Nenašli sa žiadne návrhy.</p>
+              )}
+            </div>
           ) : null}
         </div>
 
@@ -418,23 +556,6 @@ export function FeedFilters({ resultsCount }: FeedFiltersProps) {
           Tip: Skús napísať „mons“ a vyber z návrhov 👀
         </p>
       </div>
-
-      {!currentRegion ? (
-        <section className="border-input bg-secondary/40 rounded-xl border p-3">
-          <p className="text-sm font-semibold">Vyber svoj kraj</p>
-          <p className="text-muted-foreground mt-0.5 text-xs">
-            Uvidíš ponuky najmä z okolia a dohodneš sa rýchlejšie.
-          </p>
-          <Button
-            type="button"
-            size="sm"
-            className="mt-3 min-h-[44px] w-full"
-            onClick={() => setRegionOpen(true)}
-          >
-            Vybrať kraj
-          </Button>
-        </section>
-      ) : null}
 
       <div className="grid grid-cols-[1fr_auto] gap-2">
         <Button
@@ -475,35 +596,29 @@ export function FeedFilters({ resultsCount }: FeedFiltersProps) {
       <div
         className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         role="group"
-        aria-label="Rýchle filtre"
+        aria-label="Rýchle kategórie a filtre"
       >
-        <FilterChip
-          selected={currentType !== "all" || typePickerOpen}
-          onClick={() => setTypePickerOpen((value) => !value)}
-          className="min-h-[40px] shrink-0"
-        >
-          <span>
-            Typ: {TYPE_OPTIONS.find((option) => option.value === currentType)?.label ?? "Všetko"}
-          </span>
-        </FilterChip>
-
-        <FilterChip
-          selected={currentSwap}
-          onClick={() => updateParams({ swap: currentSwap ? "" : "1" })}
-          className="min-h-[40px] shrink-0"
-          title="Ponuky, kde sa dá dohodnúť aj barter"
-        >
-          Výmena
-        </FilterChip>
-
-        <FilterChip
-          selected={currentVerified}
-          onClick={() => updateParams({ verified: currentVerified ? "" : "1" })}
-          className="min-h-[40px] shrink-0"
-          title="Predajcovia s overeným telefónom"
-        >
-          Overení
-        </FilterChip>
+        {PLANT_QUICK_CATEGORIES.map((quickCategory) => {
+          const Icon = quickCategory.icon;
+          const isSelected = currentQuery.toLowerCase() === quickCategory.searchQuery.toLowerCase();
+          return (
+            <FilterChip
+              key={quickCategory.id}
+              selected={isSelected}
+              onClick={() =>
+                updateParams({
+                  q: isSelected ? "" : quickCategory.searchQuery,
+                })
+              }
+              className="min-h-[40px] shrink-0"
+            >
+              <span className="inline-flex items-center gap-1.5">
+                <Icon className="size-3.5" aria-hidden />
+                {quickCategory.label}
+              </span>
+            </FilterChip>
+          );
+        })}
 
         <FilterChip onClick={openFilters} className="min-h-[40px] shrink-0">
           Cena
@@ -514,23 +629,9 @@ export function FeedFilters({ resultsCount }: FeedFiltersProps) {
           onClick={() => setSortOpen(true)}
           className="min-h-[40px] shrink-0"
         >
-          <span className="inline-flex items-center gap-1">
-            Triediť
-            <SlidersHorizontal className="size-3.5" aria-hidden />
-          </span>
+          Triediť
         </FilterChip>
       </div>
-
-      {typePickerOpen ? (
-        <div className="rounded-xl border border-input bg-background p-2">
-          <SegmentedControl
-            ariaLabel="Typ ponúk"
-            value={currentType}
-            onValueChange={setType}
-            options={TYPE_OPTIONS}
-          />
-        </div>
-      ) : null}
 
       <Drawer open={regionOpen} onOpenChange={setRegionOpen} direction="bottom">
         <DrawerContent className="rounded-t-2xl">

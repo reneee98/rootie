@@ -23,6 +23,10 @@ type ChatComposerProps = {
   canBuyerSendOffers?: boolean;
   /** Hide buyer offer actions when deal is already confirmed. */
   dealConfirmed?: boolean;
+  /** Allow regular text/attachment chat messages. */
+  textMessagingEnabled?: boolean;
+  /** Human-readable reason shown when text chat is disabled. */
+  textMessagingDisabledReason?: string;
   /** For optimistic UI: add a temporary message before server responds */
   addOptimisticMessage?: (msg: Omit<import("@/lib/data/chat").ChatMessage, "id">) => string;
   /** Remove optimistic message on error */
@@ -36,6 +40,8 @@ export function ChatComposer({
   uploadImageUrl,
   canBuyerSendOffers = false,
   dealConfirmed = false,
+  textMessagingEnabled = true,
+  textMessagingDisabledReason,
   addOptimisticMessage,
   removeOptimisticMessage,
 }: ChatComposerProps) {
@@ -52,8 +58,17 @@ export function ChatComposer({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const swapPhotoInputRef = useRef<HTMLInputElement>(null);
+  const textChatLocked = !textMessagingEnabled;
+  const textChatLockMessage =
+    textMessagingDisabledReason ??
+    "Písanie v chate bude dostupné po splnení podmienok konverzácie.";
 
   const handleSendText = async () => {
+    if (textChatLocked) {
+      setError(textChatLockMessage);
+      return;
+    }
+
     const text = body.trim();
     if (!text && attachments.length === 0) return;
 
@@ -153,6 +168,12 @@ export function ChatComposer({
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (textChatLocked) {
+      setError(textChatLockMessage);
+      e.target.value = "";
+      return;
+    }
+
     const file = e.target.files?.[0];
     if (!file || !uploadImageUrl) return;
 
@@ -215,7 +236,11 @@ export function ChatComposer({
         </div>
       )}
 
-      {attachments.length > 0 && (
+      {textChatLocked && (
+        <p className="mb-2 text-xs text-muted-foreground">{textChatLockMessage}</p>
+      )}
+
+      {!textChatLocked && attachments.length > 0 && (
         <div className="mb-2 flex gap-2 overflow-x-auto">
           {attachments.map((att, i) => (
             <div key={i} className="relative shrink-0">
@@ -239,54 +264,56 @@ export function ChatComposer({
         </div>
       )}
 
-      <div className="flex gap-2">
-        {uploadImageUrl && (
-          <button
+      {!textChatLocked && (
+        <div className="flex gap-2">
+          {uploadImageUrl && (
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className="text-muted-foreground hover:text-foreground flex size-11 shrink-0 items-center justify-center rounded-full border border-input transition-colors"
+              aria-label="Pridať obrázok"
+            >
+              <ImagePlus className="size-5" />
+            </button>
+          )}
+
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+
+          <textarea
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                void handleSendText();
+              }
+            }}
+            placeholder="Napíšte správu…"
+            rows={1}
+            className="border-input bg-background min-h-11 flex-1 resize-none rounded-xl border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
+            disabled={pending}
+          />
+
+          <Button
             type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="text-muted-foreground hover:text-foreground flex size-11 shrink-0 items-center justify-center rounded-full border border-input transition-colors"
-            aria-label="Pridať obrázok"
-          >
-            <ImagePlus className="size-5" />
-          </button>
-        )}
-
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={handleFileChange}
-        />
-
-        <textarea
-          value={body}
-          onChange={(e) => setBody(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !e.shiftKey) {
-              e.preventDefault();
+            size="icon"
+            className="size-11 shrink-0 rounded-full"
+            onClick={() => {
               void handleSendText();
-            }
-          }}
-          placeholder="Napíšte správu…"
-          rows={1}
-          className="border-input bg-background min-h-11 flex-1 resize-none rounded-xl border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
-          disabled={pending}
-        />
-
-        <Button
-          type="button"
-          size="icon"
-          className="size-11 shrink-0 rounded-full"
-          onClick={() => {
-            void handleSendText();
-          }}
-          disabled={pending || (!body.trim() && attachments.length === 0)}
-          aria-label="Odoslať"
-        >
-          <Send className="size-4" />
-        </Button>
-      </div>
+            }}
+            disabled={pending || (!body.trim() && attachments.length === 0)}
+            aria-label="Odoslať"
+          >
+            <Send className="size-4" />
+          </Button>
+        </div>
+      )}
 
       {error && (
         <p role="alert" className="mt-1 text-sm text-destructive">

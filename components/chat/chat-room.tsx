@@ -25,6 +25,9 @@ type ChatRoomProps = {
   buyerDefaultShippingAddress?: ProfileShippingAddress | null;
   reviewEligibility?: ReviewEligibility | null;
   listingSellerId?: string | null;
+  listingType?: "fixed" | "auction";
+  canSendText?: boolean;
+  sendTextBlockedReason?: string | null;
   hasBuyerReviewed?: boolean | null;
   /** True when current user is moderator viewing thread but not a participant (read-only). */
   isModeratorViewOnly?: boolean;
@@ -40,6 +43,9 @@ export function ChatRoom({
   buyerDefaultShippingAddress,
   reviewEligibility,
   listingSellerId,
+  listingType,
+  canSendText = true,
+  sendTextBlockedReason,
   hasBuyerReviewed,
   isModeratorViewOnly = false,
 }: ChatRoomProps) {
@@ -247,7 +253,10 @@ export function ChatRoom({
     isListingThread && listingSellerId && listingSellerId === currentUserId
   );
   const canBuyerSendOffers = Boolean(
-    isListingThread && listingSellerId && listingSellerId !== currentUserId
+    isListingThread &&
+      listingType === "fixed" &&
+      listingSellerId &&
+      listingSellerId !== currentUserId
   );
   const hasOrderStatusMessage = messages.some(
     (m) =>
@@ -330,7 +339,9 @@ export function ChatRoom({
             <div className="max-w-xs rounded-xl border bg-card px-4 py-3 text-center">
               <p className="text-sm font-medium">Konverzácia je zatiaľ prázdna</p>
               <p className="mt-1 text-xs text-muted-foreground">
-                Napíšte prvú správu nižšie.
+                {canSendText
+                  ? "Napíšte prvú správu nižšie."
+                  : (sendTextBlockedReason ?? "Písanie v chate je zatiaľ vypnuté.")}
               </p>
             </div>
           </div>
@@ -376,6 +387,8 @@ export function ChatRoom({
           uploadImageUrl={uploadImageUrl}
           canBuyerSendOffers={canBuyerSendOffers}
           dealConfirmed={isOfferFlowLocked}
+          textMessagingEnabled={canSendText}
+          textMessagingDisabledReason={sendTextBlockedReason ?? undefined}
           addOptimisticMessage={addOptimisticMessage}
           removeOptimisticMessage={removeOptimisticMessage}
         />
