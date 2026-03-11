@@ -107,9 +107,16 @@ type FilterableListingsQuery<T> = {
   or: (filters: string) => T;
   ilike: (column: string, pattern: string) => T;
   gt: (column: string, value: string) => T;
-  lte: (column: string, value: string) => T;
+  lte: (column: string, value: string | number) => T;
   gte: (column: string, value: number) => T;
 };
+
+function applyActiveAuctionVisibility<T extends { or: (filters: string) => T }>(
+  query: T,
+  nowIso: string = new Date().toISOString()
+): T {
+  return query.or(`auction_ends_at.is.null,auction_ends_at.gt.${nowIso}`);
+}
 
 // ---------------------------------------------------------------------------
 // Feed query
@@ -145,6 +152,7 @@ export async function getListingsFeed(
     opts?: { skipRegion?: boolean }
   ) => {
     let q = query;
+    const nowIso = new Date().toISOString();
 
     if (!opts?.skipRegion && filters.region && filters.region !== "All Slovakia") {
       q = q.eq("region", filters.region);
@@ -161,17 +169,42 @@ export async function getListingsFeed(
     if (filters.category) {
       q = q.eq("category", filters.category);
     }
+    if (filters.type === "auction") {
+      q = q.gt("auction_ends_at", nowIso);
+    }
     if (verifiedSellerIds && verifiedSellerIds.length > 0) {
       q = q.in("seller_id", verifiedSellerIds);
     }
-    if (filters.price_min != null) {
+
+    if (filters.type === "fixed") {
+      if (filters.price_min != null) {
+        q = q.gte("fixed_price", filters.price_min);
+      }
+      if (filters.price_max != null) {
+        q = q.lte("fixed_price", filters.price_max);
+      }
+    } else if (filters.type === "auction") {
+      if (filters.price_min != null) {
+        q = q.gte("auction_start_price", filters.price_min);
+      }
+      if (filters.price_max != null) {
+        q = q.lte("auction_start_price", filters.price_max);
+      }
+    } else {
+      const fixedBranch = ["type.eq.fixed"];
+      const auctionBranch = ["type.eq.auction", `auction_ends_at.gt.${nowIso}`];
+
+      if (filters.price_min != null) {
+        fixedBranch.push(`fixed_price.gte.${filters.price_min}`);
+        auctionBranch.push(`auction_start_price.gte.${filters.price_min}`);
+      }
+      if (filters.price_max != null) {
+        fixedBranch.push(`fixed_price.lte.${filters.price_max}`);
+        auctionBranch.push(`auction_start_price.lte.${filters.price_max}`);
+      }
+
       q = q.or(
-        `fixed_price.gte.${filters.price_min},auction_start_price.gte.${filters.price_min}`
-      );
-    }
-    if (filters.price_max != null) {
-      q = q.or(
-        `fixed_price.lte.${filters.price_max},auction_start_price.lte.${filters.price_max}`
+        `and(${fixedBranch.join(",")}),and(${auctionBranch.join(",")})`
       );
     }
     if (filters.query?.trim()) {
@@ -561,6 +594,7 @@ export async function getSavedListings(
     )
     .eq("status", PUBLIC_LISTING_STATUS)
     .in("id", listingIds);
+  listQ = applyActiveAuctionVisibility(listQ);
   if (region && region !== "All Slovakia") listQ = listQ.eq("region", region);
 
   const { data: listings, error } = await listQ;
@@ -655,6 +689,7 @@ export async function getSavedListingsCount(userId: string): Promise<number> {
     .from("listings")
     .select("id", { count: "exact", head: true })
     .eq("status", PUBLIC_LISTING_STATUS)
+    .or(`auction_ends_at.is.null,auction_ends_at.gt.${new Date().toISOString()}`)
     .in("id", listingIds);
 
   if (countErr) return 0;

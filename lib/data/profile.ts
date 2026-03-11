@@ -64,6 +64,7 @@ export async function getActiveListingsBySeller(
     .select("id, plant_name, type, fixed_price, auction_start_price")
     .eq("seller_id", sellerId)
     .eq("status", PUBLIC_LISTING_STATUS)
+    .or(`auction_ends_at.is.null,auction_ends_at.gt.${new Date().toISOString()}`)
     .order("created_at", { ascending: false });
 
   if (listingsError || !listings?.length) {
