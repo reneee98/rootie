@@ -59,12 +59,15 @@ export function ChatComposer({
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const swapPhotoInputRef = useRef<HTMLInputElement>(null);
+  /** Guards against double-send when user clicks/taps rapidly or hits Enter twice. */
+  const sendingRef = useRef(false);
   const textChatLocked = !textMessagingEnabled;
   const textChatLockMessage =
     textMessagingDisabledReason ??
     "Písanie v chate bude dostupné po splnení podmienok konverzácie.";
 
   const handleSendText = async () => {
+    if (sendingRef.current) return;
     if (textChatLocked) {
       setError(textChatLockMessage);
       return;
@@ -73,6 +76,7 @@ export function ChatComposer({
     const text = body.trim();
     if (!text && attachments.length === 0) return;
 
+    sendingRef.current = true;
     setError("");
     setPending(true);
 
@@ -96,6 +100,7 @@ export function ChatComposer({
     });
 
     setPending(false);
+    sendingRef.current = false;
     if (!result.ok) {
       if (tempId && removeOptimisticMessage) removeOptimisticMessage(tempId);
       setError(result.error);
@@ -108,12 +113,14 @@ export function ChatComposer({
   };
 
   const handleSendOfferPrice = async () => {
+    if (sendingRef.current) return;
     const amount = parseFloat(offerAmount.replace(",", "."));
     if (isNaN(amount) || amount <= 0) {
       setError("Zadajte platnú sumu.");
       return;
     }
 
+    sendingRef.current = true;
     setError("");
     setPending(true);
     const result = await sendMessage({
@@ -123,6 +130,7 @@ export function ChatComposer({
       metadata: { amount_eur: amount },
     });
     setPending(false);
+    sendingRef.current = false;
 
     if (!result.ok) {
       setError(result.error);
@@ -135,6 +143,7 @@ export function ChatComposer({
   };
 
   const handleSendOfferSwap = async () => {
+    if (sendingRef.current) return;
     const text = offerSwapText.trim();
     if (!text) {
       setError("Popíšte, čo ponúkate na výmenu.");
@@ -143,6 +152,7 @@ export function ChatComposer({
 
     const photoUrls = swapPhotos.map((photo) => photo.url);
 
+    sendingRef.current = true;
     setError("");
     setPending(true);
     const result = await sendMessage({
@@ -156,6 +166,7 @@ export function ChatComposer({
       attachments: swapPhotos.length > 0 ? swapPhotos : undefined,
     });
     setPending(false);
+    sendingRef.current = false;
 
     if (!result.ok) {
       setError(result.error);

@@ -109,39 +109,39 @@ export async function warnUserFromReport(
 
   if (!report) return { ok: false, error: "Nahlásenie neexistuje" };
 
-  let userId: string | null = null;
+  let userIds: string[] = [];
   if (report.target_type === "user") {
-    userId = report.target_id;
+    userIds = [report.target_id];
   } else if (report.target_type === "listing") {
     const { data: listing } = await supabase
       .from("listings")
       .select("seller_id")
       .eq("id", report.target_id)
       .single();
-    userId = listing?.seller_id ?? null;
+    if (listing?.seller_id) userIds = [listing.seller_id];
   } else if (report.target_type === "message") {
     const { data: msg } = await supabase
       .from("messages")
       .select("sender_id")
       .eq("id", report.target_id)
       .single();
-    userId = msg?.sender_id ?? null;
+    if (msg?.sender_id) userIds = [msg.sender_id];
   } else if (report.target_type === "thread") {
     const { data: thread } = await supabase
       .from("threads")
-      .select("user1_id")
+      .select("user1_id, user2_id")
       .eq("id", report.target_id)
       .single();
-    userId = thread?.user1_id ?? null;
+    userIds = [thread?.user1_id, thread?.user2_id].filter(Boolean) as string[];
   }
 
-  if (!userId) return { ok: false, error: "Nepodarilo sa určiť používateľa" };
+  if (userIds.length === 0) return { ok: false, error: "Nepodarilo sa určiť používateľa" };
 
   const now = new Date().toISOString();
   const { error } = await supabase
     .from("profiles")
     .update({ warned_at: now, updated_at: now })
-    .eq("id", userId);
+    .in("id", userIds);
 
   if (error) return { ok: false, error: error.message };
 
@@ -176,39 +176,39 @@ export async function banUserFromReport(
 
   if (!report) return { ok: false, error: "Nahlásenie neexistuje" };
 
-  let userId: string | null = null;
+  let userIds: string[] = [];
   if (report.target_type === "user") {
-    userId = report.target_id;
+    userIds = [report.target_id];
   } else if (report.target_type === "listing") {
     const { data: listing } = await supabase
       .from("listings")
       .select("seller_id")
       .eq("id", report.target_id)
       .single();
-    userId = listing?.seller_id ?? null;
+    if (listing?.seller_id) userIds = [listing.seller_id];
   } else if (report.target_type === "message") {
     const { data: msg } = await supabase
       .from("messages")
       .select("sender_id")
       .eq("id", report.target_id)
       .single();
-    userId = msg?.sender_id ?? null;
+    if (msg?.sender_id) userIds = [msg.sender_id];
   } else if (report.target_type === "thread") {
     const { data: thread } = await supabase
       .from("threads")
-      .select("user1_id")
+      .select("user1_id, user2_id")
       .eq("id", report.target_id)
       .single();
-    userId = thread?.user1_id ?? null;
+    userIds = [thread?.user1_id, thread?.user2_id].filter(Boolean) as string[];
   }
 
-  if (!userId) return { ok: false, error: "Nepodarilo sa určiť používateľa" };
+  if (userIds.length === 0) return { ok: false, error: "Nepodarilo sa určiť používateľa" };
 
   const now = new Date().toISOString();
   const { error } = await supabase
     .from("profiles")
     .update({ is_banned: true, updated_at: now })
-    .eq("id", userId);
+    .in("id", userIds);
 
   if (error) return { ok: false, error: error.message };
 

@@ -4,6 +4,14 @@ import { getModeratorReports } from "@/lib/data/reports";
 import { ReportActions } from "@/components/admin/report-actions";
 import { formatDateTime } from "@/lib/formatters";
 
+const REASON_LABELS: Record<string, string> = {
+  spam: "Spam",
+  harassment: "Obtěžovanie",
+  scam: "Podvod",
+  inappropriate_content: "Nevhodný obsah",
+  other: "Iné",
+};
+
 export default async function AdminReportsPage() {
   const reports = await getModeratorReports();
 
@@ -61,7 +69,7 @@ export default async function AdminReportsPage() {
 
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Flag className="size-3 shrink-0" aria-hidden />
-                  <span>Dôvod: {report.reason}</span>
+                  <span>Dôvod: {REASON_LABELS[report.reason] ?? report.reason}</span>
                 </div>
 
                 {report.details && (

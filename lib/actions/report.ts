@@ -37,9 +37,11 @@ export async function reportUser(
     return { ok: false, error: "Cannot report yourself" };
   }
 
-  const validReason =
-    REPORT_REASONS.includes(reason as (typeof REPORT_REASONS)[number]) ||
-    reason;
+  const validReason = REPORT_REASONS.includes(
+    reason as (typeof REPORT_REASONS)[number]
+  )
+    ? reason
+    : "other";
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("reports").insert({
     reporter_id: user.id,
@@ -89,9 +91,11 @@ export async function reportListing(
     return { ok: false, error: "Not authenticated" };
   }
 
-  const validReason =
-    REPORT_REASONS.includes(reason as (typeof REPORT_REASONS)[number]) ||
-    reason;
+  const validReason = REPORT_REASONS.includes(
+    reason as (typeof REPORT_REASONS)[number]
+  )
+    ? reason
+    : "other";
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("reports").insert({
     reporter_id: user.id,
@@ -136,9 +140,11 @@ export async function reportMessage(
     return { ok: false, error: "Not authenticated" };
   }
 
-  const validReason =
-    REPORT_REASONS.includes(reason as (typeof REPORT_REASONS)[number]) ||
-    reason;
+  const validReason = REPORT_REASONS.includes(
+    reason as (typeof REPORT_REASONS)[number]
+  )
+    ? reason
+    : "other";
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("reports").insert({
     reporter_id: user.id,
@@ -170,9 +176,11 @@ export async function reportThread(
     return { ok: false, error: "Not authenticated" };
   }
 
-  const validReason =
-    REPORT_REASONS.includes(reason as (typeof REPORT_REASONS)[number]) ||
-    reason;
+  const validReason = REPORT_REASONS.includes(
+    reason as (typeof REPORT_REASONS)[number]
+  )
+    ? reason
+    : "other";
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase.from("reports").insert({
     reporter_id: user.id,
