@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState, useCallback, useEffect, useState } from "react";
+import { useActionState, useEffect, useState } from "react";
 import { Flag, MessageCircle } from "lucide-react";
 
 import {
@@ -30,7 +30,6 @@ type ListingActionsProps = {
 
 export function ListingActions({
   listingId,
-  sellerId,
   isOwnListing,
   isAuthenticated,
   isAuction = false,
@@ -43,6 +42,7 @@ export function ListingActions({
 
   useEffect(() => {
     if (reportState?.ok === true) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setReportOpen(false);
     }
   }, [reportState]);

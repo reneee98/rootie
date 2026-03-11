@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -197,13 +198,9 @@ export function ChatHeader({ thread }: ChatHeaderProps) {
           className="border-t bg-muted/30 flex min-h-14 items-center gap-3 px-4 py-2 transition-colors hover:bg-muted/50"
         >
           {thread.context_card.type === "listing" && (
-            <div className="size-11 shrink-0 overflow-hidden rounded bg-muted">
+            <div className="relative size-11 shrink-0 overflow-hidden rounded bg-muted">
               {thread.context_card.image_url ? (
-                <img
-                  src={thread.context_card.image_url}
-                  alt=""
-                  className="size-full object-cover"
-                />
+                <Image fill src={thread.context_card.image_url} alt="" className="object-cover" />
               ) : (
                 <div className="text-muted-foreground flex size-full items-center justify-center">
                   <Package2 className="size-4" aria-hidden />

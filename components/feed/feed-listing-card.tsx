@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useState } from "react";
 import Link from "next/link";
 import { ArrowLeftRight, ImageOff, ShieldCheck, Star } from "lucide-react";
@@ -79,12 +80,13 @@ export function FeedListingCardComponent({
             {!imgLoaded ? (
               <div className="absolute inset-0 animate-pulse bg-muted" aria-hidden />
             ) : null}
-            <img
+            <Image
+              fill
               ref={handleImageRef}
               src={listing.first_photo_url}
               alt=""
               className={cn(
-                "absolute inset-0 size-full object-cover object-center transition-opacity duration-200",
+                "object-cover object-center transition-opacity duration-200",
                 imgLoaded ? "opacity-100" : "opacity-0"
               )}
               loading="lazy"

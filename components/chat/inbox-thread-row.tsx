@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 import { ShieldCheck, ArrowLeftRight } from "lucide-react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -145,12 +146,8 @@ export function InboxThreadRow({ thread }: InboxThreadRowProps) {
       {/* Optional: small listing/wanted thumbnail */}
       {thread.context_preview.type === "listing" &&
         thread.context_preview.image_url && (
-          <div className="size-12 shrink-0 overflow-hidden rounded-md bg-muted">
-            <img
-              src={thread.context_preview.image_url}
-              alt=""
-              className="size-full object-cover"
-            />
+          <div className="relative size-12 shrink-0 overflow-hidden rounded-md bg-muted">
+            <Image fill src={thread.context_preview.image_url} alt="" className="object-cover" />
           </div>
         )}
     </Link>

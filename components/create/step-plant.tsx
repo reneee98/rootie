@@ -94,6 +94,7 @@ export function StepPlant({ draft, updateDraft, errors }: StepProps) {
             autoComplete="off"
             role="combobox"
             aria-expanded={showDropdown}
+            aria-controls="plant-autocomplete-listbox"
           />
           {isSearching && (
             <div className="absolute right-3 top-1/2 -translate-y-1/2">
@@ -105,6 +106,7 @@ export function StepPlant({ draft, updateDraft, errors }: StepProps) {
         {/* Autocomplete dropdown */}
         {showDropdown && (
           <div
+            id="plant-autocomplete-listbox"
             role="listbox"
             className="absolute z-20 mt-1 w-full rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto"
           >

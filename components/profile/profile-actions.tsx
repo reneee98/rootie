@@ -57,6 +57,7 @@ export function ProfileActions({
 
   useEffect(() => {
     if (reportState?.ok === true) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setReportOpen(false);
     }
   }, [reportState]);

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useRef, useState } from "react";
 import { ArrowLeftRight, Euro, ImagePlus, Send, X } from "lucide-react";
 
@@ -244,7 +245,9 @@ export function ChatComposer({
         <div className="mb-2 flex gap-2 overflow-x-auto">
           {attachments.map((att, i) => (
             <div key={i} className="relative shrink-0">
-              <img
+              <Image
+                width={64}
+                height={64}
                 src={att.url}
                 alt=""
                 className="h-16 w-16 rounded-lg object-cover"
@@ -419,7 +422,9 @@ export function ChatComposer({
                 <div className="flex gap-2 overflow-x-auto pb-1">
                   {swapPhotos.map((photo, i) => (
                     <div key={`${photo.url}-${i}`} className="relative shrink-0">
-                      <img
+                      <Image
+                        width={80}
+                        height={80}
                         src={photo.url}
                         alt=""
                         className="h-20 w-20 rounded-lg object-cover"

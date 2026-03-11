@@ -50,8 +50,6 @@ export function ListingReactionsBar({
   const handleSelect = async (type: ReactionType) => {
     if (!isAuthenticated) return;
     const previous = displayReaction;
-    const previousCount = previous ? displayCounts[previous] ?? 0 : 0;
-    const newCount = displayCounts[type] ?? 0;
     const isTogglingOff = previous === type;
 
     setOptimisticReaction(isTogglingOff ? null : type);

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/formatters";
 import { getConditionLabel, getSizeLabel } from "@/lib/listing-labels";
@@ -46,10 +47,11 @@ export function StepReview({ draft, errors, publishError, onGoToStep }: Props) {
               key={photo.storagePath}
               className="relative shrink-0 size-20 rounded-lg overflow-hidden bg-muted"
             >
-              <img
+              <Image
+                fill
                 src={photo.url}
                 alt={`Fotka ${i + 1}`}
-                className="w-full h-full object-cover"
+                className="object-cover"
               />
             </div>
           ))}

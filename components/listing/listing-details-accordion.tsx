@@ -3,7 +3,6 @@
 import { MapPin, Ruler, Leaf, Tag, FileText } from "lucide-react";
 import { getConditionLabel, getSizeLabel } from "@/lib/listing-labels";
 import { getRegionShortLabel } from "@/lib/regions";
-import { cn } from "@/lib/utils";
 
 type ListingDetailsAccordionProps = {
   condition: string | null;

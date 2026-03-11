@@ -31,12 +31,8 @@ export function WantedCreateForm({ defaultRegion = "" }: WantedCreateFormProps) 
 
   const [plantName, setPlantName] = useState("");
   const [plantTaxonId, setPlantTaxonId] = useState<string | null>(null);
-  const [region, setRegion] = useState("");
+  const [region, setRegion] = useState(defaultRegion);
   const [district, setDistrict] = useState("");
-
-  useEffect(() => {
-    if (defaultRegion) setRegion(defaultRegion);
-  }, [defaultRegion]);
   const [budgetMin, setBudgetMin] = useState("");
   const [budgetMax, setBudgetMax] = useState("");
   const [negotiable, setNegotiable] = useState(true);
@@ -160,6 +156,7 @@ export function WantedCreateForm({ defaultRegion = "" }: WantedCreateFormProps) 
                 key={taxon.id}
                 type="button"
                 role="option"
+                aria-selected={plantTaxonId === taxon.id}
                 onClick={() => handleSelectTaxon(taxon)}
                 className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-muted/50 border-b last:border-b-0"
               >

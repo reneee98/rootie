@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 
@@ -128,10 +129,11 @@ export function MojeSections({
                     >
                       <div className="relative size-14 shrink-0 overflow-hidden rounded-md bg-muted">
                         {purchase.listing_photo_url ? (
-                          <img
+                          <Image
+                            fill
                             src={purchase.listing_photo_url}
                             alt=""
-                            className="absolute inset-0 size-full object-cover object-center"
+                            className="object-cover object-center"
                           />
                         ) : (
                           <span className="text-muted-foreground flex size-full items-center justify-center text-[10px]">

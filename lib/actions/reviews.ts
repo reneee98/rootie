@@ -4,10 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { getUser } from "@/lib/auth";
-import {
-  getReviewEligibility,
-  getThreadDealState,
-} from "@/lib/data/reviews";
+import { getReviewEligibility } from "@/lib/data/reviews";
 
 export type ConfirmDealResult =
   | { ok: true }

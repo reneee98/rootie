@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 import type { ListingCard } from "@/lib/data/profile";
@@ -29,10 +30,11 @@ function ListingCardCell({ listing }: { listing: ListingCard }) {
     >
       <div className="relative aspect-square w-full shrink-0 overflow-hidden bg-muted">
         {listing.first_photo_url ? (
-          <img
+          <Image
+            fill
             src={listing.first_photo_url}
             alt=""
-            className="absolute inset-0 size-full object-cover object-center"
+            className="object-cover object-center"
           />
         ) : (
           <span className="text-muted-foreground flex size-full items-center justify-center text-xs">

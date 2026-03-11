@@ -45,6 +45,7 @@ export function InboxRealtimeSync({ threadIds }: InboxRealtimeSyncProps) {
         supabase.removeChannel(channelToRemove);
       }, 0);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- stable string key avoids array reference inequality; threadIds is captured inside the effect
   }, [router, threadIds.slice().sort().join(",")]);
 
   return null;

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ChevronLeft, ChevronRight, ImageOff } from "lucide-react";
 
@@ -88,20 +89,12 @@ export function PhotoGallery({ photos, alt }: PhotoGalleryProps) {
                 <span>Bez fotky</span>
               </div>
             ) : (
-              <img
-                ref={(node) => {
-                  if (!node || !node.complete) return;
-                  if (node.naturalWidth <= 16 || node.naturalHeight <= 16) {
-                    markFailed(i);
-                    markLoaded(i);
-                    return;
-                  }
-                  markLoaded(i);
-                }}
+              <Image
+                fill
                 src={p.url}
                 alt={i === 0 ? alt : `${alt} — fotka ${i + 1}`}
                 className={cn(
-                  "size-full object-cover transition-opacity duration-200",
+                  "object-cover transition-opacity duration-200",
                   loaded[i] ? "opacity-100" : "opacity-0"
                 )}
                 loading={i === 0 ? "eager" : "lazy"}

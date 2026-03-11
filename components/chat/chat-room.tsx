@@ -118,6 +118,7 @@ export function ChatRoom({
         supabase.removeChannel(channelToRemove);
       }, 0);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps -- currentUserId is stable (auth session), adding it would cause unnecessary channel resubscription
   }, [thread.id]);
 
   useEffect(() => {

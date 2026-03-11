@@ -160,12 +160,13 @@ export function WizardShell({ userId, defaultRegion }: Props) {
   const [publishError, setPublishError] = useState("");
   const [loaded, setLoaded] = useState(false);
 
-  /* Load from localStorage on mount */
+  /* Load from localStorage on mount — setState inside effect is intentional (SSR constraint) */
   useEffect(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
       if (saved) {
         const parsed = JSON.parse(saved) as Partial<ListingDraft>;
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setDraft((prev) => ({ ...prev, ...parsed }));
       } else if (defaultRegion) {
         setDraft((prev) => ({ ...prev, region: defaultRegion }));

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState } from "react";
 import { ArrowLeftRight, CheckCircle2, Euro, Info } from "lucide-react";
 
@@ -360,7 +361,9 @@ export function MessageBubble({
                   rel="noopener noreferrer"
                   className="overflow-hidden rounded-lg border border-white/20"
                 >
-                  <img
+                  <Image
+                    width={80}
+                    height={80}
                     src={url}
                     alt=""
                     className="h-20 w-20 object-cover"
@@ -466,6 +469,7 @@ export function MessageBubble({
                 rel="noopener noreferrer"
                 className="overflow-hidden rounded-lg border border-white/20"
               >
+                {/* eslint-disable-next-line @next/next/no-img-element -- variable-size attachment, next/image requires fixed dimensions */}
                 <img
                   src={att.url}
                   alt=""

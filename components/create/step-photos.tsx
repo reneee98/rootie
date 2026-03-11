@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useRef } from "react";
 import { Camera, ImagePlus, X, ChevronUp, ChevronDown } from "lucide-react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
@@ -152,11 +153,12 @@ export function StepPhotos({ draft, updateDraft, errors, userId }: Props) {
         <div className="grid grid-cols-3 gap-2">
           {draft.photos.map((photo, i) => (
             <div key={photo.storagePath} className="relative group">
-              <div className="aspect-square rounded-lg overflow-hidden bg-muted">
-                <img
+              <div className="relative aspect-square rounded-lg overflow-hidden bg-muted">
+                <Image
+                  fill
                   src={photo.url}
                   alt={`Fotka ${i + 1}`}
-                  className="w-full h-full object-cover"
+                  className="object-cover"
                   loading="lazy"
                 />
               </div>
