@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DefaultShippingAddressSection } from "@/components/me/default-shipping-address-section";
+import { ProfileInfoSection } from "@/components/me/profile-info-section";
 import { requireUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { getProfileShippingAddress } from "@/lib/data/orders";
@@ -21,12 +22,14 @@ export default async function MePage() {
     await Promise.all([
       supabase
         .from("profiles")
-        .select("is_moderator")
+        .select("is_moderator, display_name, bio")
         .eq("id", user.id)
         .single(),
       getProfileShippingAddress(user.id),
     ]);
   const isModerator = Boolean(profile?.is_moderator);
+  const profileDisplayName = (profile?.display_name as string | null) ?? null;
+  const profileBio = (profile?.bio as string | null) ?? null;
 
   const displayName =
     (user.user_metadata.full_name as string | undefined) ??
@@ -68,6 +71,11 @@ export default async function MePage() {
               </Link>
             </Button>
           )}
+
+          <ProfileInfoSection
+            initialDisplayName={profileDisplayName}
+            initialBio={profileBio}
+          />
 
           <DefaultShippingAddressSection initialAddress={defaultShippingAddress} />
 

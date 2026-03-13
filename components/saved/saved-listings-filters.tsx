@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from "next/navigation";
 import { useTransition } from "react";
 
-import { ROOTIE_REGIONS } from "@/lib/regions";
+import { ROOTIE_REGIONS, getRegionShortLabel } from "@/lib/regions";
 
 type SavedListingsFiltersProps = {
   currentRegion: string;
@@ -42,7 +42,7 @@ export function SavedListingsFilters({
       >
         {ROOTIE_REGIONS.map((r) => (
           <option key={r} value={r}>
-            {r}
+            {getRegionShortLabel(r)}
           </option>
         ))}
       </select>

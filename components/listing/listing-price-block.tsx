@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { formatPrice } from "@/lib/formatters";
 import { cn } from "@/lib/utils";
+import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 
 type ListingPriceBlockProps = {
   type: "fixed" | "auction";
@@ -11,6 +12,8 @@ type ListingPriceBlockProps = {
   auctionStartPrice: number | null;
   bidCount: number;
   auctionEndsAt: string | null;
+  /** Listing id – used to subscribe to realtime bid updates */
+  listingId?: string;
   /** When true (auction ended), show "Aukcia skončila" instead of countdown */
   auctionEnded?: boolean;
   /** Optional "Dohodou" label for fixed price */
@@ -33,13 +36,16 @@ export function ListingPriceBlock({
   fixedPrice,
   currentBid,
   auctionStartPrice,
-  bidCount,
+  bidCount: initialBidCount,
   auctionEndsAt,
+  listingId,
   auctionEnded = false,
   priceNegotiable = false,
 }: ListingPriceBlockProps) {
   const isFixed = type === "fixed";
   const auctionPrice = currentBid ?? auctionStartPrice ?? 0;
+
+  const [bidCount, setBidCount] = useState(initialBidCount);
 
   const [countdown, setCountdown] = useState<{ text: string; ended: boolean }>(
     () =>
@@ -56,6 +62,30 @@ export function ListingPriceBlock({
     const id = setInterval(tick, 1000);
     return () => clearInterval(id);
   }, [auctionEndsAt, auctionEnded]);
+
+  useEffect(() => {
+    if (!listingId || isFixed) return;
+    const supabase = createSupabaseBrowserClient();
+    const channel = supabase
+      .channel(`price-block-bids-${listingId}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "bids",
+          filter: `listing_id=eq.${listingId}`,
+        },
+        () => {
+          setBidCount((prev) => prev + 1);
+        }
+      )
+      .subscribe();
+    return () => {
+      const ch = channel;
+      setTimeout(() => supabase.removeChannel(ch), 0);
+    };
+  }, [listingId, isFixed]);
 
   if (isFixed) {
     const showPrice = fixedPrice != null && fixedPrice > 0;

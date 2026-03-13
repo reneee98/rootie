@@ -118,6 +118,7 @@ export default async function ListingPage({ params }: ListingPageProps) {
             bidCount={listing.bid_count}
             auctionEndsAt={listing.auction_ends_at}
             auctionEnded={auctionEnded}
+            listingId={listing.id}
           />
 
           {!isFixed && auctionEnded && (

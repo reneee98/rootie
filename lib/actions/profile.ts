@@ -4,6 +4,42 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { getUser } from "@/lib/auth";
 
+export type UpdateProfileInfoResult =
+  | { ok: true }
+  | { ok: false; error: string };
+
+/** Update current user's display name and bio. */
+export async function updateProfileInfo(
+  displayName: string,
+  bio: string
+): Promise<UpdateProfileInfoResult> {
+  const user = await getUser();
+  if (!user) {
+    return { ok: false, error: "Nie ste prihlásený" };
+  }
+
+  const trimmedName = displayName.trim().slice(0, 80);
+  const trimmedBio = bio.trim().slice(0, 500);
+
+  const supabase = await createSupabaseServerClient();
+  const { error } = await supabase
+    .from("profiles")
+    .update({
+      display_name: trimmedName || null,
+      bio: trimmedBio || null,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("id", user.id);
+
+  if (error) {
+    return { ok: false, error: error.message };
+  }
+
+  revalidatePath("/me");
+  revalidatePath("/profile/[userId]", "page");
+  return { ok: true };
+}
+
 export type UpdatePhoneResult =
   | { ok: true }
   | { ok: false; error: string };
