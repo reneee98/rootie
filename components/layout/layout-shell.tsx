@@ -20,13 +20,13 @@ function isAuthRoute(pathname: string) {
  */
 export function LayoutShell({
   children,
-  isAuthenticated = false,
 }: LayoutShellProps) {
   const pathname = usePathname();
   const isAdminRoute = pathname?.startsWith("/admin") ?? false;
   const onAuthRoute = isAuthRoute(pathname ?? "");
+  const isStandaloneHome = pathname === "/";
 
-  if (isAdminRoute || onAuthRoute) {
+  if (isAdminRoute || onAuthRoute || isStandaloneHome) {
     return <>{children}</>;
   }
 

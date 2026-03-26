@@ -1,15 +1,50 @@
+import Image from "next/image";
 import Link from "next/link";
+import { Rubik } from "next/font/google";
 
-import { FeedFilters } from "@/components/feed/feed-filters";
-import { FeedHomeSections } from "@/components/feed/feed-home-sections";
-import { LoadMoreButton } from "@/components/feed/load-more-button";
-import { EmptyState } from "@/components/ui/empty-state";
-import { Button } from "@/components/ui/button";
+import { HomeBottomNav } from "@/components/home/home-bottom-nav";
+import { AuctionCountdown } from "@/components/home/auction-countdown";
 import {
   getListingsFeed,
   type FeedFilters as ListingFeedFilters,
+  type FeedListingCard,
 } from "@/lib/data/listings";
 import { getUser } from "@/lib/auth";
+import { formatPrice } from "@/lib/formatters";
+
+const rubik = Rubik({
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "700"],
+});
+
+const NEW_CARD_PLACEHOLDERS = [
+  "/figma-home/ph-new-1.png",
+  "/figma-home/ph-new-2.png",
+  "/figma-home/ph-new-3.png",
+  "/figma-home/ph-new-4.png",
+];
+const AUCTION_CARD_PLACEHOLDER = "/figma-home/ph-auction.png";
+const RANDOM_AUCTION_IMAGE_POOL = [
+  "/figma-home/ph-auction.png",
+  "/figma-home/ph-new-1.png",
+  "/figma-home/ph-new-2.png",
+  "/figma-home/ph-new-3.png",
+];
+const FALLBACK_AUCTION_ENDS = ["2026-04-02T18:30:00.000Z", "2026-04-03T20:15:00.000Z"];
+
+function AppFixedBackground() {
+  return (
+    <div aria-hidden className="pointer-events-none fixed inset-0 z-0 overflow-hidden bg-[#f2ede2]">
+      <div
+        className="absolute inset-0 bg-repeat [background-position:center_top]"
+        style={{
+          backgroundImage: "url('/figma-home/bg-4695.svg')",
+          backgroundSize: "921.705px 702.87px",
+        }}
+      />
+    </div>
+  );
+}
 
 type HomePageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -77,7 +112,10 @@ function parseSearchParams(
         : "newest";
 
   const categoryRaw = str("category");
-  const category = categoryRaw === "accessory" ? "accessory" : undefined;
+  const category =
+    categoryRaw === "plant" || categoryRaw === "accessory"
+      ? categoryRaw
+      : undefined;
 
   const sizeRaw = str("size");
   const size: "S" | "M" | "L" | undefined =
@@ -151,6 +189,221 @@ function getClearFiltersHref(filters: HomeFilters) {
   return qs ? `/?${qs}` : "/";
 }
 
+function firstSellerName(name: string | null) {
+  return name?.trim().split(/\s+/)[0] || "Predajca";
+}
+
+function formatRegionWithKraj(region: string) {
+  const value = region.trim();
+  if (!value) return "Slovensko";
+  if (value.toLowerCase().includes("kraj")) return value;
+  return `${value} kraj`;
+}
+
+function cardImage(listing: FeedListingCard, index: number, auction = false) {
+  if (listing.first_photo_url) return listing.first_photo_url;
+  if (auction) return AUCTION_CARD_PLACEHOLDER;
+  return NEW_CARD_PLACEHOLDERS[index % NEW_CARD_PLACEHOLDERS.length];
+}
+
+function createFallbackAuctionListings(count: number): FeedListingCard[] {
+  return Array.from({ length: count }, (_, index) => ({
+    id: `fallback-auction-${index + 1}`,
+    plant_name: index % 2 === 0 ? "Philodendron pink" : "Monstera variegata",
+    created_at: "2026-03-26T12:00:00.000Z",
+    type: "auction",
+    swap_enabled: false,
+    category: "plant",
+    fixed_price: null,
+    auction_start_price: index % 2 === 0 ? 350 : 280,
+    auction_ends_at: FALLBACK_AUCTION_ENDS[index % FALLBACK_AUCTION_ENDS.length],
+    region: index % 2 === 0 ? "Trnavský" : "Bratislavský",
+    first_photo_url: RANDOM_AUCTION_IMAGE_POOL[index % RANDOM_AUCTION_IMAGE_POOL.length],
+    seller_phone_verified: true,
+    seller_avatar_url: null,
+    seller_ratings_avg: 5,
+    seller_ratings_count: 1,
+    seller_display_name: index % 2 === 0 ? "Renco" : "Michaela",
+    bid_count: index % 2 === 0 ? 5 : 3,
+    current_bid: index % 2 === 0 ? 450 : 390,
+    photo_count: 1,
+    is_saved: false,
+  }));
+}
+
+function SectionLabel({
+  iconSrc,
+  label,
+  count,
+}: {
+  iconSrc: string;
+  label: string;
+  count: number;
+}) {
+  return (
+    <div className="flex h-[21px] items-center gap-[7px]">
+      <Image src={iconSrc} alt="" width={18} height={18} className="size-[17.5px]" />
+      <p className="text-[12px] font-medium leading-[21px] tracking-[0.04em] text-[#232711] uppercase">
+        {label}
+      </p>
+      <p className="text-[12.25px] leading-[17.5px] text-[#c8c2b4]">({count})</p>
+    </div>
+  );
+}
+
+function NewListingCard({
+  listing,
+  index,
+}: {
+  listing: FeedListingCard;
+  index: number;
+}) {
+  const pill =
+    listing.category === "accessory"
+      ? {
+          text: "Odrezok",
+          textClass: "text-[#4f5826]",
+          bgClass: "bg-[#c4c35b]",
+        }
+      : {
+          text: "Rastlina",
+          textClass: "text-[#c4c35b]",
+          bgClass: "bg-[#4f5826]",
+        };
+
+  return (
+    <Link
+      href={`/listing/${listing.id}`}
+      className="overflow-hidden rounded-[14px] bg-[#faf8f4] shadow-[0_2px_6px_rgba(0,0,0,0.03)]"
+    >
+      <div className="relative h-[167.75px] overflow-hidden p-[10px]">
+        <Image
+          fill
+          src={cardImage(listing, index)}
+          alt={listing.plant_name}
+          className="object-cover"
+          sizes="(max-width: 768px) 50vw, 182px"
+        />
+        <span
+          className={`relative z-10 inline-flex items-center rounded-[8px] px-[6px] py-[4px] text-[10px] leading-[14px] ${pill.bgClass} ${pill.textClass}`}
+        >
+          {pill.text}
+        </span>
+      </div>
+
+      <div className="space-y-[5.25px] p-[10px] text-[#232711]">
+        <div>
+          <div className="flex h-[14px] items-center gap-[3.5px]">
+            <Image
+              src="/figma-home/location-new.svg"
+              alt=""
+              width={11}
+              height={11}
+              className="size-[10.5px]"
+            />
+            <span className="text-[10px] leading-[14px] text-[#5a6e5a]">{listing.region}</span>
+          </div>
+          <p className="w-full truncate text-[12px] font-medium leading-[21px]">{listing.plant_name}</p>
+        </div>
+
+        <p className="text-[16px] font-semibold leading-[20px]">
+          {listing.fixed_price != null ? formatPrice(listing.fixed_price) : "Dohodou"}
+        </p>
+
+        <div className="flex items-center justify-between rounded-[8px] bg-[#f6f3ed] px-[7px] py-[5px]">
+          <span className="text-[10px] leading-[14px] text-[#5a6e5a]">
+            {firstSellerName(listing.seller_display_name)}
+          </span>
+          <span className="flex items-center gap-[1.75px] text-[10px] leading-[17.5px]">
+            <Image src="/figma-home/star-new.svg" alt="" width={11} height={11} className="size-[10.5px]" />
+            <span className="font-bold text-[#232711]">5</span>
+            <span className="text-[#c8c2b4]">({listing.seller_ratings_count || 1})</span>
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function AuctionListingCard({
+  listing,
+  index,
+}: {
+  listing: FeedListingCard;
+  index: number;
+}) {
+  const current = listing.current_bid ?? listing.auction_start_price;
+
+  return (
+    <Link
+      href={`/listing/${listing.id}`}
+      className="overflow-hidden rounded-[14px] bg-[#faf8f4] shadow-[0_2px_6px_rgba(0,0,0,0.03)]"
+    >
+      <div className="relative h-[167.75px] overflow-hidden p-[10px]">
+        <Image
+          fill
+          src={cardImage(listing, index, true)}
+          alt={listing.plant_name}
+          className="object-cover"
+          sizes="(max-width: 768px) 50vw, 182px"
+        />
+        <span className="relative z-10 inline-flex items-center gap-[3.5px] rounded-[8px] bg-[#f7a9ae] px-[6px] py-[4px] text-[10px] leading-[14px] text-[#6d4a4d]">
+          <Image
+            src="/figma-home/auction-3011-clock.svg"
+            alt=""
+            width={11}
+            height={11}
+            className="size-[10.5px]"
+          />
+          <AuctionCountdown endsAt={listing.auction_ends_at} />
+        </span>
+      </div>
+
+      <div className="space-y-[5.25px] p-[10px] text-[#232711]">
+        <div>
+          <div className="flex h-[14px] items-center gap-[3.5px]">
+            <Image
+              src="/figma-home/auction-3011-location.svg"
+              alt=""
+              width={11}
+              height={11}
+              className="size-[10.5px]"
+            />
+            <span className="text-[10px] leading-[14px] text-[#5a6e5a]">
+              {formatRegionWithKraj(listing.region)}
+            </span>
+          </div>
+          <p className="w-full truncate text-[12px] font-medium leading-[21px]">{listing.plant_name}</p>
+        </div>
+
+        <div>
+          <p className="text-[10px] leading-[14px] text-[#5a6e5a]">Aktuálne:</p>
+          <p className="text-[16px] font-semibold leading-[20px]">
+            {current != null ? formatPrice(current) : "-"}
+          </p>
+        </div>
+
+        <div className="flex items-center justify-between rounded-[8px] bg-[#f6f3ed] px-[7px] py-[5px]">
+          <span className="text-[10px] leading-[14px] text-[#5a6e5a]">
+            {firstSellerName(listing.seller_display_name)}
+          </span>
+          <span className="flex items-center gap-[1.75px] text-[10px] leading-[17.5px]">
+            <Image
+              src="/figma-home/auction-3011-star.svg"
+              alt=""
+              width={11}
+              height={11}
+              className="size-[10.5px]"
+            />
+            <span className="font-bold text-[#232711]">5</span>
+            <span className="text-[#c8c2b4]">({listing.seller_ratings_count || 1})</span>
+          </span>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
 export default async function HomePage({ searchParams }: HomePageProps) {
   const rawParams = await searchParams;
   const filters = parseSearchParams(rawParams);
@@ -182,86 +435,210 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   ]).catch(() => null);
 
   if (!feedData) {
-    const params = new URLSearchParams();
-    Object.entries(rawParams).forEach(([key, value]) => {
-      if (typeof value === "string") params.set(key, value);
-    });
-    const href = params.toString() ? `/?${params.toString()}` : "/";
-
     return (
-      <div className="space-y-4">
-        <FeedFilters />
-        <EmptyState
-          title="Ups, niečo sa pokazilo"
-          description="Skús to ešte raz."
-          action={
-            <Button asChild className="min-h-[44px]">
-              <Link href={href}>Obnoviť</Link>
-            </Button>
-          }
-        />
+      <div className={`${rubik.className} relative min-h-dvh text-[#232711]`}>
+        <AppFixedBackground />
+        <div className="relative z-10 px-4 py-10">
+          <div className="mx-auto max-w-md rounded-[24px] bg-[#faf8f4]/94 p-6 backdrop-blur-[1px]">
+            <p className="text-lg font-bold">Úvodná stránka sa nepodarila načítať</p>
+            <p className="mt-2 text-sm text-[#5a6e5a]">Skús obnoviť stránku ešte raz.</p>
+          </div>
+        </div>
       </div>
     );
   }
 
   const [mainFeed, trendingFeed, endingSoonFeed] = feedData;
   const strictFilters = hasStrictFilters(filters);
-  const hasRegion = Boolean(filters.region);
-  const isEmpty = mainFeed.listings.length === 0;
+  const featuredListings = trendingFeed.listings.slice(0, 4);
+  const newestListings = mainFeed.listings.slice(0, 4);
+  const fallbackAuctions = createFallbackAuctionListings(2);
+  const auctionListings = [...endingSoonFeed.listings.slice(0, 2), ...fallbackAuctions].slice(0, 4);
+
+  const chips = [
+    { label: "Monstera", href: "/?q=Monstera" },
+    { label: "Philodendron", href: "/?q=Philodendron" },
+    { label: "Hoya", href: "/?q=Hoya" },
+    { label: "Anthurium", href: "/?q=Anthurium" },
+    { label: "Alocasia", href: "/?q=Alocasia" },
+    { label: "Syngonium", href: "/?q=Syngonium" },
+    { label: "Pothos", href: "/?q=Pothos" },
+    { label: "Scindapsus", href: "/?q=Scindapsus" },
+    { label: "Calathea", href: "/?q=Calathea" },
+    { label: "Begonia", href: "/?q=Begonia" },
+    { label: "Orchid", href: "/?q=Orchid" },
+    { label: "Ficus", href: "/?q=Ficus" },
+    { label: "Cactus", href: "/?q=Cactus" },
+    { label: "Sukulenty", href: "/?q=Sukulenty" },
+  ];
 
   return (
-    <div className="space-y-4">
-      <div id="home-filters">
-        <FeedFilters resultsCount={mainFeed.listings.length} />
+    <div className={`${rubik.className} relative min-h-dvh text-[#232711]`}>
+      <AppFixedBackground />
+      <div className="relative z-10 mx-auto w-full max-w-md pb-[6.8rem]">
+        <header className="px-[14px] py-[10px]">
+          <div className="flex justify-center py-[2px]">
+            <Link href="/" aria-label="Rootie">
+              <Image
+                src="/figma-home/logo.svg"
+                alt="Rootie"
+                width={104}
+                height={31}
+                priority
+                className="h-[31px] w-[104px]"
+              />
+            </Link>
+          </div>
+
+          <form action="/" className="mt-[10.5px] flex items-center gap-[10px]">
+            <label className="flex h-[44px] flex-1 items-center gap-[6px] rounded-[18px] border-2 border-[#c4c35b]/20 bg-[#faf8f4] px-[12px] shadow-[0_2px_6px_rgba(0,0,0,0.03)]">
+              <Image src="/figma-home/search.svg" alt="" width={18} height={18} className="size-[18px]" />
+              <input
+                type="search"
+                name="q"
+                defaultValue={filters.query ?? ""}
+                placeholder="Hľadať rastliny..."
+                className="w-full bg-transparent text-[14px] leading-normal text-[#878379] outline-none placeholder:text-[#878379]"
+              />
+            </label>
+            <button
+              type="submit"
+              className="flex size-[44px] items-center justify-center rounded-[18px] bg-[#4f5826] shadow-[0_2px_6px_rgba(0,0,0,0.1)]"
+              aria-label="Filtre"
+            >
+              <Image src="/figma-home/filter.svg" alt="" width={18} height={18} className="size-[17.5px]" />
+            </button>
+          </form>
+
+          <div className="-mx-[14px] mt-[10.5px] flex items-center gap-[8.75px] overflow-x-auto overflow-y-hidden pl-[14px] pr-[14px] pb-[2px] whitespace-nowrap touch-pan-x snap-x snap-mandatory scroll-pl-[14px] [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
+            {chips.map((chip) => {
+              const active = filters.query === chip.label;
+              return (
+                <Link
+                  key={chip.label}
+                  href={chip.href}
+                  className="shrink-0 snap-start rounded-[18px] bg-[#faf8f4] shadow-[0_2px_6px_rgba(0,0,0,0.03)]"
+                >
+                  <span className="flex items-center gap-[6px] p-[8px]">
+                    <span className="flex size-[38px] items-center justify-center rounded-full bg-[#f1ece1] p-[2px]">
+                      <Image
+                        src="/figma-home/chip-21404-icon.svg"
+                        alt=""
+                        width={23}
+                        height={23}
+                        className="size-[23px]"
+                      />
+                    </span>
+                    <span
+                      className={`text-center text-[12px] font-medium leading-[21px] ${
+                        active ? "text-[#4f5826]" : "text-[#232711]"
+                      }`}
+                    >
+                      {chip.label}
+                    </span>
+                  </span>
+                </Link>
+              );
+            })}
+            {strictFilters ? (
+              <Link
+                href={getClearFiltersHref(filters)}
+                className="inline-flex h-[54px] shrink-0 snap-start items-center rounded-[18px] bg-[#f6f3ed] px-[14px] text-[12px] font-medium leading-[21px] text-[#4f5826]"
+              >
+                Reset
+              </Link>
+            ) : null}
+          </div>
+        </header>
+
+        <main className="space-y-[12px]">
+          {featuredListings.length > 0 ? (
+            <section className="space-y-[12px] px-[14px] py-[10px]">
+              <SectionLabel
+                iconSrc="/figma-home/trending-391-icon.svg"
+                label="Trending v tvojom kraji"
+                count={featuredListings.length}
+              />
+              <div className="grid grid-cols-2 gap-[10.5px]">
+                {featuredListings.map((listing, index) => (
+                  <NewListingCard key={listing.id} listing={listing} index={index} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {!currentUser ? (
+            <section className="px-[14px] py-[2px]">
+              <Link
+                href="/signup"
+                className="relative flex h-[135px] items-center gap-[14px] overflow-hidden rounded-[14px] bg-[#c4c35b] p-[17.5px] text-[#4f5826]"
+              >
+                <Image
+                  src="/figma-home/cta-3364-bg-bottom.svg"
+                  alt=""
+                  width={415.5}
+                  height={170.666}
+                  className="pointer-events-none absolute left-[-34px] top-[69.36px] h-[170.666px] w-[415.5px] max-w-none"
+                />
+                <Image
+                  src="/figma-home/cta-3364-bg-top.svg"
+                  alt=""
+                  width={415.5}
+                  height={170.666}
+                  className="pointer-events-none absolute left-[-34px] top-[-111.64px] h-[170.666px] w-[415.5px] max-w-none rotate-180"
+                />
+                <div className="min-w-0 flex-1">
+                  <p className="text-[19px] font-bold leading-[21px]">Vytvor si účet zadarmo</p>
+                  <p className="mt-[3.5px] text-[14px] leading-[16.844px]">
+                    Ukladaj obľúbené rastliny a komunikuj
+                    <br />
+                    s predajcami
+                  </p>
+                </div>
+                <Image
+                  src="/figma-home/cta-3364-arrow.svg"
+                  alt=""
+                  width={37}
+                  height={37}
+                  className="relative z-10 size-[37px] shrink-0"
+                />
+              </Link>
+            </section>
+          ) : null}
+
+          {newestListings.length > 0 ? (
+            <section className="space-y-[12px] px-[14px] py-[10px]">
+              <SectionLabel
+                iconSrc="/figma-home/section-new.svg"
+                label="Nové prírastky"
+                count={newestListings.length}
+              />
+              <div className="grid grid-cols-2 gap-[10.5px]">
+                {newestListings.map((listing, index) => (
+                  <NewListingCard key={listing.id} listing={listing} index={index + 1} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {auctionListings.length > 0 ? (
+            <section className="space-y-[12px] px-[14px] py-[10px]">
+              <SectionLabel
+                iconSrc="/figma-home/auction-3011-section.svg"
+                label="Končí čoskoro"
+                count={auctionListings.length}
+              />
+              <div className="grid grid-cols-2 gap-[10.5px]">
+                {auctionListings.map((listing, index) => (
+                  <AuctionListingCard key={listing.id} listing={listing} index={index} />
+                ))}
+              </div>
+            </section>
+          ) : null}
+        </main>
       </div>
 
-      {isEmpty ? (
-        strictFilters ? (
-          <EmptyState
-            title="Nič sme nenašli"
-            description="Skús uvoľniť filtre alebo prepnúť typ."
-            action={
-              <div className="flex w-full max-w-xs flex-col gap-2">
-                <Button asChild className="min-h-[44px] w-full">
-                  <Link href="#home-filters">Upraviť filtre</Link>
-                </Button>
-                <Button asChild variant="outline" className="min-h-[44px] w-full">
-                  <Link href={getClearFiltersHref(filters)}>Vymazať filtre</Link>
-                </Button>
-              </div>
-            }
-          />
-        ) : (
-          <EmptyState
-            title="Zatiaľ tu nič nie je 🌱"
-            description={
-              hasRegion
-                ? "Buď prvý, kto pridá ponuku, ľudia v tvojom kraji to uvidia hneď."
-                : "Vyber svoj kraj alebo pridaj prvú ponuku v komunite."
-            }
-            action={
-              <div className="flex w-full max-w-xs flex-col gap-2">
-                <Button asChild className="min-h-[44px] w-full">
-                  <Link href="/create">Pridať inzerát</Link>
-                </Button>
-                <Button asChild variant="outline" className="min-h-[44px] w-full">
-                  <Link href="/">Skúsiť iný kraj</Link>
-                </Button>
-              </div>
-            }
-          />
-        )
-      ) : (
-        <FeedHomeSections
-          trendingInRegion={trendingFeed.listings.slice(0, 8)}
-          endingSoon={endingSoonFeed.listings.slice(0, 8)}
-          forceEndingSoonSection={filters.type === "auction"}
-          mainListings={mainFeed.listings}
-          hasMore={mainFeed.hasMore}
-          isAuthenticated={!!currentUser}
-          loadMoreSlot={<LoadMoreButton />}
-        />
-      )}
+      <HomeBottomNav isAuthenticated={Boolean(currentUser)} />
     </div>
   );
 }

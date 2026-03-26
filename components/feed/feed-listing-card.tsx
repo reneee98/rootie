@@ -146,7 +146,7 @@ export function FeedListingCardComponent({
       </div>
 
       <div className="space-y-2 p-3">
-        <p className="line-clamp-2 min-h-[40px] text-sm font-semibold leading-snug">
+        <p className="truncate text-sm font-semibold leading-snug">
           {listing.plant_name}
         </p>
 

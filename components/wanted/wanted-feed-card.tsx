@@ -67,7 +67,7 @@ export function WantedFeedCard({ item }: WantedFeedCardProps) {
       </div>
 
       <div className="space-y-2 p-3">
-        <p className="line-clamp-2 min-h-[40px] text-sm font-semibold leading-snug">
+        <p className="truncate text-sm font-semibold leading-snug">
           {item.plant_name}
         </p>
         <p className="text-sm font-semibold">{budgetLabel}</p>

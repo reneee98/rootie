@@ -43,7 +43,7 @@ function ListingCardCell({ listing }: { listing: ListingCard }) {
         )}
       </div>
       <div className="flex flex-1 flex-col gap-0.5 p-2">
-        <span className="line-clamp-2 text-sm font-medium">
+        <span className="truncate text-sm font-medium">
           {listing.plant_name}
         </span>
         {priceLabel ? (
