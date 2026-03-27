@@ -31,9 +31,13 @@ export function InboxTabs({ threads }: InboxTabsProps) {
 
   if (threads.length === 0) {
     return (
-      <div className="space-y-4 pb-24">
-        <h1 className="text-lg font-semibold">Inbox</h1>
-        <div className="flex flex-col items-center gap-2 py-16 text-center">
+      <div className="rootie-page">
+        <header className="rootie-page-header space-y-1">
+          <p className="rootie-page-eyebrow">Správy</p>
+          <h1 className="rootie-page-title">Inbox</h1>
+          <p className="rootie-page-description">Tu nájdete všetky konverzácie s kupujúcimi a predajcami.</p>
+        </header>
+        <div className="rootie-surface flex flex-col items-center gap-2 py-16 text-center">
           <p className="text-muted-foreground text-sm">
             Zatiaľ nemáte žiadne konverzácie.
           </p>
@@ -47,15 +51,19 @@ export function InboxTabs({ threads }: InboxTabsProps) {
   }
 
   return (
-    <div className="space-y-4 pb-24">
+    <div className="rootie-page">
       <InboxRealtimeSync threadIds={threads.map((t) => t.id)} />
 
-      <h1 className="text-lg font-semibold">Inbox</h1>
+      <header className="rootie-page-header space-y-1">
+        <p className="rootie-page-eyebrow">Správy</p>
+        <h1 className="rootie-page-title">Inbox</h1>
+        <p className="rootie-page-description">Sledujte aktívne a vyriešené konverzácie na jednom mieste.</p>
+      </header>
 
       <div
         role="tablist"
         aria-label="Typ konverzácií"
-        className="flex rounded-lg border bg-muted/50 p-0.5"
+        className="rootie-surface flex p-0.5"
       >
         {visibleTabs.map(({ id, label, count }) => (
           <button
@@ -93,7 +101,7 @@ export function InboxTabs({ threads }: InboxTabsProps) {
         {tab === "active" && (
           <>
             {activeThreads.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-16 text-center">
+              <div className="rootie-surface flex flex-col items-center gap-2 py-16 text-center">
                 <p className="text-muted-foreground text-sm">
                   Žiadne aktívne konverzácie.
                 </p>
@@ -125,7 +133,7 @@ export function InboxTabs({ threads }: InboxTabsProps) {
         {tab === "resolved" && (
           <>
             {resolvedThreads.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-16 text-center">
+              <div className="rootie-surface flex flex-col items-center gap-2 py-16 text-center">
                 <p className="text-muted-foreground text-sm">
                   Zatiaľ nemáte vyriešené konverzácie.
                 </p>

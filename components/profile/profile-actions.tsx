@@ -164,7 +164,7 @@ export function ProfileActions({
               <select
                 id="report-reason"
                 name="reason"
-                className="border-input bg-background focus-visible:ring-ring flex h-11 w-full rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2"
+                className="rootie-field"
                 required
               >
                 {reasons.map((r) => (
@@ -185,7 +185,7 @@ export function ProfileActions({
                 name="details"
                 placeholder="Popis problému\u2026"
                 rows={3}
-                className="border-input focus-visible:ring-ring w-full min-w-0 resize-y rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] md:text-sm"
+                className="rootie-textarea min-w-0 text-base md:text-sm"
               />
               {reportState?.ok === false && (
                 <p className="text-destructive text-sm">{reportState.error}</p>

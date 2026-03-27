@@ -16,14 +16,18 @@ export default async function AdminReportsPage() {
   const reports = await getModeratorReports();
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 pb-24 pt-4">
-      <div className="flex items-center gap-2">
-        <Shield className="size-5 text-muted-foreground" aria-hidden />
-        <h1 className="text-lg font-semibold">Nahlásenia</h1>
+    <div className="rootie-page pb-8">
+      <div className="rootie-page-header space-y-1">
+        <p className="rootie-page-eyebrow inline-flex items-center gap-2">
+          <Shield className="size-4 text-muted-foreground" aria-hidden />
+          Moderácia
+        </p>
+        <h1 className="rootie-page-title">Nahlásenia</h1>
+        <p className="rootie-page-description">Správa otvorených reportov používateľov a obsahu.</p>
       </div>
 
       {reports.length === 0 ? (
-        <div className="rounded-lg border bg-card p-8 text-center">
+        <div className="rootie-surface p-8 text-center">
           <p className="text-muted-foreground text-sm">
             Žiadne otvorené nahlásenia.
           </p>
@@ -33,7 +37,7 @@ export default async function AdminReportsPage() {
           {reports.map((report) => (
             <li
               key={report.id}
-              className="rounded-lg border bg-card overflow-hidden"
+              className="rootie-surface overflow-hidden"
             >
               <div className="p-3 space-y-2">
                 <div className="flex items-start justify-between gap-2">

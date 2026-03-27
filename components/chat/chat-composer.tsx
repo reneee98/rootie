@@ -310,7 +310,7 @@ export function ChatComposer({
             }}
             placeholder="Napíšte správu…"
             rows={1}
-            className="border-input bg-background min-h-11 flex-1 resize-none rounded-xl border px-3 py-2 text-sm outline-none focus:border-ring focus:ring-2 focus:ring-ring/20"
+            className="rootie-field min-h-11 flex-1 resize-none rounded-[14px] py-2"
             disabled={pending}
           />
 
@@ -355,7 +355,7 @@ export function ChatComposer({
               value={offerAmount}
               onChange={(e) => setOfferAmount(e.target.value)}
               placeholder="0"
-              className="border-input bg-background h-11 w-full rounded-lg border px-3 text-sm"
+              className="rootie-field"
               disabled={pending}
             />
           </div>
@@ -401,7 +401,7 @@ export function ChatComposer({
               onChange={(e) => setOfferSwapText(e.target.value)}
               placeholder="Napríklad: Filodendron + doplatok."
               rows={3}
-              className="border-input bg-background w-full resize-none rounded-lg border px-3 py-2 text-sm"
+              className="rootie-textarea resize-none"
               disabled={pending}
             />
 

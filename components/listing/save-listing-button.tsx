@@ -10,25 +10,34 @@ import { cn } from "@/lib/utils";
 type SaveListingButtonProps = {
   listingId: string;
   isSaved: boolean;
+  initialSaveCount?: number;
   isAuthenticated: boolean;
   variant?: "icon" | "label";
+  showCount?: boolean;
   className?: string;
 };
 
 export function SaveListingButton({
   listingId,
   isSaved,
+  initialSaveCount = 0,
   isAuthenticated,
   variant = "icon",
+  showCount = false,
   className,
 }: SaveListingButtonProps) {
   const [isPending, startTransition] = useTransition();
   const [saved, setSaved] = useState(isSaved);
+  const [saveCount, setSaveCount] = useState(initialSaveCount);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
   useEffect(() => {
     setSaved(isSaved);
   }, [isSaved]);
+
+  useEffect(() => {
+    setSaveCount(initialSaveCount);
+  }, [initialSaveCount]);
 
   useEffect(() => {
     if (!toastMessage) return;
@@ -43,6 +52,7 @@ export function SaveListingButton({
         .then((result) => {
           if (!result.ok) return;
           setSaved(result.is_saved);
+          setSaveCount(result.save_count);
           setToastMessage(result.is_saved ? "Uložené ✅" : "Odložené z uložených");
           if (typeof window !== "undefined") {
             window.dispatchEvent(new Event("rootie:saved-changed"));
@@ -59,22 +69,32 @@ export function SaveListingButton({
   }
 
   const label = saved ? "Uložené" : "Uložiť";
+  const ariaLabel = showCount ? `${label}, uložené ${saveCount}` : label;
 
   return (
     <>
       <Button
         type="button"
         variant={variant === "icon" ? "outline" : "secondary"}
-        size={variant === "icon" ? "icon" : "sm"}
+        size={variant === "icon" && showCount ? "sm" : variant === "icon" ? "icon" : "sm"}
         disabled={!isAuthenticated || isPending}
         onClick={handleClick}
         className={cn(className)}
-        aria-label={label}
+        aria-label={ariaLabel}
         aria-pressed={saved}
         title={!isAuthenticated ? "Prihláste sa" : label}
       >
-        <Heart className={cn("size-4", saved && "fill-current")} aria-hidden />
+        <Heart
+          className={cn(
+            "size-4",
+            saved ? "fill-[#ef4444] text-[#ef4444]" : "text-current"
+          )}
+          aria-hidden
+        />
         {variant === "label" ? <span className="ml-1.5">{label}</span> : null}
+        {variant === "icon" && showCount ? (
+          <span className="text-[12px] font-semibold leading-none">{saveCount}</span>
+        ) : null}
       </Button>
 
       {toastMessage ? (

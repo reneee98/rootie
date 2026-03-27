@@ -35,11 +35,11 @@ function SellerAuctionCard({ listing }: SellerAuctionCardProps) {
   const topBid = listing.bids[0]?.amount ?? null;
 
   return (
-    <div className="rounded-lg border bg-card">
+    <div className="rootie-surface">
       {/* Listing header */}
       <Link
         href={`/listing/${listing.listing_id}`}
-        className="flex gap-3 p-3 hover:bg-accent/50 transition-colors rounded-t-lg"
+        className="flex gap-3 rounded-t-[14px] p-3 transition-colors hover:bg-accent/50"
       >
         {listing.image_url && (
           <div className="relative size-12 shrink-0 overflow-hidden rounded-md bg-muted">
@@ -169,7 +169,7 @@ function BidderAuctionCard({ listing }: BidderAuctionCardProps) {
   return (
     <Link
       href={`/listing/${listing.listing_id}`}
-      className="flex gap-3 rounded-lg border bg-card p-3 hover:bg-accent/50 transition-colors"
+      className="rootie-surface flex gap-3 p-3 transition-colors hover:bg-accent/50"
     >
       {/* Photo */}
       {listing.image_url ? (

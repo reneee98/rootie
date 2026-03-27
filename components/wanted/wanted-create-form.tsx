@@ -16,9 +16,9 @@ const INTENT_OPTIONS = [
 ];
 
 const inputClasses =
-  "h-12 w-full rounded-lg border border-input bg-background px-3 text-base outline-none focus:border-ring focus:ring-ring/50 focus:ring-[3px]";
+  "rootie-field h-12 text-base";
 const selectClasses =
-  "h-12 w-full rounded-lg border border-input bg-background px-3 text-base outline-none focus:border-ring focus:ring-ring/50 focus:ring-[3px] appearance-none";
+  "rootie-field h-12 text-base appearance-none";
 
 type WantedCreateFormProps = {
   defaultRegion?: string;
@@ -149,7 +149,7 @@ export function WantedCreateForm({ defaultRegion = "" }: WantedCreateFormProps) 
         {showPlantDropdown && (
           <div
             role="listbox"
-            className="absolute z-20 mt-1 w-full rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto"
+            className="rootie-surface absolute z-20 mt-1 max-h-60 w-full overflow-y-auto"
           >
             {plantResults.map((taxon) => (
               <button
@@ -305,7 +305,7 @@ export function WantedCreateForm({ defaultRegion = "" }: WantedCreateFormProps) 
           onChange={(e) => setNotes(e.target.value)}
           placeholder="Doplňujúce informácie…"
           rows={3}
-          className="w-full rounded-lg border border-input bg-background px-3 py-2 text-base outline-none focus:border-ring focus:ring-ring/50 focus:ring-[3px] resize-none"
+          className="rootie-textarea resize-none text-base"
         />
       </div>
 

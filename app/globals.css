@@ -7,8 +7,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-sans: var(--font-rubik);
+  --font-mono: var(--font-rubik);
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -49,73 +49,72 @@
 
 /* Rootie design system: 8pt grid, neutral light bg, subtle green primary. */
 :root {
-  --radius: 0.625rem;
-  --background: oklch(0.99 0 0);
-  --foreground: oklch(0.18 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.18 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.18 0 0);
-  /* Subtle green accent for primary actions and badges */
-  --primary: oklch(0.45 0.12 155);
-  --primary-foreground: oklch(0.99 0 0);
-  --secondary: oklch(0.96 0.01 155);
-  --secondary-foreground: oklch(0.28 0.02 155);
-  --muted: oklch(0.96 0.005 155);
-  --muted-foreground: oklch(0.5 0.01 155);
-  --accent: oklch(0.96 0.01 155);
-  --accent-foreground: oklch(0.28 0.02 155);
-  --destructive: oklch(0.55 0.22 25);
-  --border: oklch(0.91 0.005 155);
-  --input: oklch(0.91 0.005 155);
-  --ring: oklch(0.45 0.12 155);
-  --chart-1: oklch(0.45 0.12 155);
-  --chart-2: oklch(0.55 0.15 200);
-  --chart-3: oklch(0.5 0.1 280);
-  --chart-4: oklch(0.7 0.15 85);
-  --chart-5: oklch(0.6 0.12 30);
-  --sidebar: oklch(0.98 0.005 155);
-  --sidebar-foreground: oklch(0.18 0 0);
-  --sidebar-primary: oklch(0.45 0.12 155);
-  --sidebar-primary-foreground: oklch(0.99 0 0);
-  --sidebar-accent: oklch(0.96 0.01 155);
-  --sidebar-accent-foreground: oklch(0.28 0.02 155);
-  --sidebar-border: oklch(0.91 0.005 155);
-  --sidebar-ring: oklch(0.45 0.12 155);
+  --radius: 0.875rem;
+  --background: #f2ede2;
+  --foreground: #232711;
+  --card: #faf8f4;
+  --card-foreground: #232711;
+  --popover: #faf8f4;
+  --popover-foreground: #232711;
+  --primary: #4f5826;
+  --primary-foreground: #faf8f4;
+  --secondary: #f1ece1;
+  --secondary-foreground: #4f5826;
+  --muted: #f6f3ed;
+  --muted-foreground: #67635c;
+  --accent: #c4c35b;
+  --accent-foreground: #4f5826;
+  --destructive: #fb2c36;
+  --border: #e9e2d1;
+  --input: #e9e2d1;
+  --ring: #4f5826;
+  --chart-1: #4f5826;
+  --chart-2: #c4c35b;
+  --chart-3: #f7a9ae;
+  --chart-4: #5a6e5a;
+  --chart-5: #6d4a4d;
+  --sidebar: #f2ede2;
+  --sidebar-foreground: #232711;
+  --sidebar-primary: #4f5826;
+  --sidebar-primary-foreground: #faf8f4;
+  --sidebar-accent: #f1ece1;
+  --sidebar-accent-foreground: #4f5826;
+  --sidebar-border: #e9e2d1;
+  --sidebar-ring: #4f5826;
 }
 
 .dark {
-  --background: oklch(0.16 0.01 155);
-  --foreground: oklch(0.96 0 0);
-  --card: oklch(0.2 0.01 155);
-  --card-foreground: oklch(0.96 0 0);
-  --popover: oklch(0.2 0.01 155);
-  --popover-foreground: oklch(0.96 0 0);
-  --primary: oklch(0.55 0.14 155);
-  --primary-foreground: oklch(0.14 0 0);
-  --secondary: oklch(0.26 0.02 155);
-  --secondary-foreground: oklch(0.96 0 0);
-  --muted: oklch(0.26 0.02 155);
-  --muted-foreground: oklch(0.65 0.02 155);
-  --accent: oklch(0.26 0.02 155);
-  --accent-foreground: oklch(0.96 0 0);
-  --destructive: oklch(0.6 0.2 25);
-  --border: oklch(0.32 0.02 155);
-  --input: oklch(0.28 0.02 155);
-  --ring: oklch(0.55 0.14 155);
-  --chart-1: oklch(0.55 0.14 155);
-  --chart-2: oklch(0.65 0.15 200);
-  --chart-3: oklch(0.6 0.12 280);
-  --chart-4: oklch(0.75 0.15 85);
-  --chart-5: oklch(0.65 0.14 30);
-  --sidebar: oklch(0.2 0.01 155);
-  --sidebar-foreground: oklch(0.96 0 0);
-  --sidebar-primary: oklch(0.55 0.14 155);
-  --sidebar-primary-foreground: oklch(0.14 0 0);
-  --sidebar-accent: oklch(0.26 0.02 155);
-  --sidebar-accent-foreground: oklch(0.96 0 0);
-  --sidebar-border: oklch(0.32 0.02 155);
-  --sidebar-ring: oklch(0.55 0.14 155);
+  --background: #232711;
+  --foreground: #faf8f4;
+  --card: #2f3420;
+  --card-foreground: #faf8f4;
+  --popover: #2f3420;
+  --popover-foreground: #faf8f4;
+  --primary: #c4c35b;
+  --primary-foreground: #232711;
+  --secondary: #3b4127;
+  --secondary-foreground: #e9e2d1;
+  --muted: #3b4127;
+  --muted-foreground: #c8c2b4;
+  --accent: #c4c35b;
+  --accent-foreground: #232711;
+  --destructive: #fb2c36;
+  --border: #4f5826;
+  --input: #4f5826;
+  --ring: #c4c35b;
+  --chart-1: #c4c35b;
+  --chart-2: #f7a9ae;
+  --chart-3: #e9e2d1;
+  --chart-4: #5a6e5a;
+  --chart-5: #6d4a4d;
+  --sidebar: #232711;
+  --sidebar-foreground: #faf8f4;
+  --sidebar-primary: #c4c35b;
+  --sidebar-primary-foreground: #232711;
+  --sidebar-accent: #3b4127;
+  --sidebar-accent-foreground: #e9e2d1;
+  --sidebar-border: #4f5826;
+  --sidebar-ring: #c4c35b;
 }
 
 @layer base {
@@ -128,6 +127,10 @@
   }
   body {
     @apply bg-background text-foreground font-sans text-sm;
+    background-image: url("/figma-home/bg-4695.svg");
+    background-repeat: repeat;
+    background-size: 921.705px 702.87px;
+    background-attachment: fixed;
   }
   /* Design system typography (use in components) */
   .rootie-h1 {
@@ -144,5 +147,46 @@
   }
   .rootie-caption {
     @apply text-xs text-muted-foreground;
+  }
+}
+
+@layer components {
+  .rootie-page {
+    @apply space-y-4 pb-24;
+  }
+
+  .rootie-page-header {
+    @apply rounded-[18px] border-2 border-[#c4c35b]/20 bg-[#faf8f4] px-4 py-4 shadow-[0_2px_6px_rgba(0,0,0,0.03)];
+  }
+
+  .rootie-page-eyebrow {
+    @apply text-[12px] font-medium leading-[21px] tracking-[0.04em] text-[#232711] uppercase;
+  }
+
+  .rootie-page-title {
+    @apply text-lg font-semibold leading-tight text-[#232711];
+  }
+
+  .rootie-page-description {
+    @apply text-sm text-[#67635c];
+  }
+
+  .rootie-surface {
+    @apply rounded-[14px] border border-[#e9e2d1] bg-[#faf8f4] shadow-[0_2px_6px_rgba(0,0,0,0.03)];
+  }
+
+  .rootie-field {
+    @apply h-11 w-full rounded-[14px] border border-[#e9e2d1] bg-[#faf8f4] px-3 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30;
+  }
+
+  .rootie-textarea {
+    @apply w-full resize-y rounded-[14px] border border-[#e9e2d1] bg-[#faf8f4] px-3 py-2 text-sm outline-none transition-colors focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring/30;
+  }
+
+  /* Keep single clear icon in fullscreen search input. */
+  .search-no-native-cancel::-webkit-search-cancel-button {
+    -webkit-appearance: none;
+    appearance: none;
+    display: none;
   }
 }

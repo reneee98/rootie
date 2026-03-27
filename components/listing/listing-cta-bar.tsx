@@ -38,12 +38,16 @@ export function ListingCtaBar({
   bidCount = 0,
 }: ListingCtaBarProps) {
   const isSold = status === "sold";
+  const wrapperClass =
+    "fixed bottom-0 left-0 right-0 z-40 bg-[#faf8f4] px-[14px] pt-[15px] pb-[calc(14px+env(safe-area-inset-bottom))] shadow-[0_-25px_50px_rgba(0,0,0,0.25)]";
+  const ctaButtonClass =
+    "h-[49px] w-full gap-[8.75px] rounded-[14px] bg-[#c4c35b] text-[14px] font-medium text-[#4f5826] shadow-[0_2px_6px_rgba(0,0,0,0.1)] hover:bg-[#c4c35b]/90";
 
   if (isOwnListing) {
     return (
-      <div className="bg-background/95 supports-[backdrop-filter]:bg-background/85 fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 border-t backdrop-blur">
-        <div className="mx-auto flex max-w-md px-4 py-3">
-          <Button asChild className="min-h-11 flex-1" size="lg">
+      <div className={wrapperClass}>
+        <div className="mx-auto flex max-w-md">
+          <Button asChild className={ctaButtonClass} size="lg">
             <Link href={`/listing/${listingId}/edit`}>Upraviť inzerát</Link>
           </Button>
         </div>
@@ -53,20 +57,20 @@ export function ListingCtaBar({
 
   if (isAuction) {
     return (
-      <div className="bg-background/95 supports-[backdrop-filter]:bg-background/85 fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 border-t backdrop-blur">
-        <div className="mx-auto flex max-w-md px-4 py-3">
+      <div className={wrapperClass}>
+        <div className="mx-auto flex max-w-md">
           {isSold ? (
             isAuctionWinner ? (
               isAuthenticated ? (
                 <form action={getOrCreateListingThreadFormAction} className="w-full">
                   <input type="hidden" name="listingId" value={listingId} />
-                  <Button type="submit" className="min-h-11 w-full gap-2" size="lg">
+                  <Button type="submit" className={ctaButtonClass} size="lg">
                     <Handshake className="size-4" aria-hidden />
                     Kontaktovať predajcu
                   </Button>
                 </form>
               ) : (
-                <Button asChild className="min-h-11 w-full gap-2" size="lg">
+                <Button asChild className={ctaButtonClass} size="lg">
                   <Link href={`/login?next=${encodeURIComponent(`/listing/${listingId}`)}`}>
                     <Handshake className="size-4" aria-hidden />
                     Kontaktovať predajcu
@@ -74,12 +78,12 @@ export function ListingCtaBar({
                 </Button>
               )
             ) : (
-              <div className="text-muted-foreground flex w-full items-center justify-center rounded-lg border py-2.5 text-sm">
+              <div className="flex h-[49px] w-full items-center justify-center rounded-[14px] border border-[#d6cfbc] bg-[#faf8f4] text-sm text-[#67635c]">
                 Predané
               </div>
             )
           ) : auctionEnded ? (
-            <div className="text-muted-foreground flex w-full items-center justify-center rounded-lg border py-2.5 text-sm">
+            <div className="flex h-[49px] w-full items-center justify-center rounded-[14px] border border-[#d6cfbc] bg-[#faf8f4] text-sm text-[#67635c]">
               Aukcia skončila
             </div>
           ) : (
@@ -102,21 +106,21 @@ export function ListingCtaBar({
   }
 
   return (
-    <div className="bg-background/95 supports-[backdrop-filter]:bg-background/85 fixed bottom-[calc(4.25rem+env(safe-area-inset-bottom))] left-0 right-0 z-40 border-t backdrop-blur">
-      <div className="mx-auto flex max-w-md px-4 py-3">
+    <div className={wrapperClass}>
+      <div className="mx-auto flex max-w-md">
         {isSold ? (
-          <div className="text-muted-foreground flex w-full items-center justify-center rounded-lg border py-2.5 text-sm">
+          <div className="flex h-[49px] w-full items-center justify-center rounded-[14px] border border-[#d6cfbc] bg-[#faf8f4] text-sm text-[#67635c]">
             Predané
           </div>
         ) : isAuthenticated ? (
-          <Button asChild className="min-h-11 w-full gap-2" size="lg">
+          <Button asChild className={ctaButtonClass} size="lg">
             <Link href={`/listing/${listingId}/offer`}>
               <Handshake className="size-4" aria-hidden />
               Poslať ponuku
             </Link>
           </Button>
         ) : (
-          <Button asChild className="min-h-11 w-full gap-2" size="lg">
+          <Button asChild className={ctaButtonClass} size="lg">
             <Link href={`/login?next=${encodeURIComponent(`/listing/${listingId}/offer`)}`}>
               <Handshake className="size-4" aria-hidden />
               Poslať ponuku

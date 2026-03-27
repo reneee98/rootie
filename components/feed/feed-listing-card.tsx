@@ -69,7 +69,7 @@ export function FeedListingCardComponent({
     <Link
       href={`/listing/${listing.id}`}
       className={cn(
-        "focus-visible:ring-ring flex flex-col overflow-hidden rounded-2xl border border-border/90 bg-card shadow-sm",
+        "rootie-surface focus-visible:ring-ring flex flex-col overflow-hidden",
         "outline-none transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2"
       )}
       aria-label={listing.plant_name}

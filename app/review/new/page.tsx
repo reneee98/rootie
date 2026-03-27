@@ -5,6 +5,7 @@ import { getReviewEligibility } from "@/lib/data/reviews";
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { SubmitReviewForm } from "@/components/review/submit-review-form";
 import { Button } from "@/components/ui/button";
+import { RootiePageShell } from "@/components/layout/rootie-page-shell";
 
 type ReviewNewPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -30,15 +31,20 @@ export default async function ReviewNewPage({ searchParams }: ReviewNewPageProps
 
   if (!eligibility.eligible) {
     return (
-      <div className="space-y-4 py-6">
-        <h1 className="text-lg font-semibold">Napísať recenziu</h1>
-        <p className="text-muted-foreground text-sm">
-          {eligibility.reason ?? "Nemôžete hodnotiť tohto predajcu za tento inzerát."}
-        </p>
-        <Button asChild variant="outline">
-          <Link href="/inbox">Späť do správ</Link>
-        </Button>
-      </div>
+      <RootiePageShell
+        eyebrow="Hodnotenie"
+        title="Napísať recenziu"
+        description="Recenziu je možné pridať iba pre oprávnené konverzácie."
+      >
+        <div className="rootie-surface space-y-3 p-4">
+          <p className="text-muted-foreground text-sm">
+            {eligibility.reason ?? "Nemôžete hodnotiť tohto predajcu za tento inzerát."}
+          </p>
+          <Button asChild variant="outline">
+            <Link href="/inbox">Späť do správ</Link>
+          </Button>
+        </div>
+      </RootiePageShell>
     );
   }
 
@@ -58,16 +64,20 @@ export default async function ReviewNewPage({ searchParams }: ReviewNewPageProps
   const sellerName = seller?.display_name?.trim() ?? "Predajca";
 
   return (
-    <div className="space-y-4 py-6">
-      <h1 className="text-lg font-semibold">Napísať recenziu</h1>
-      <p className="text-muted-foreground text-sm">
-        Hodnotíte predajcu <strong>{sellerName}</strong> za inzerát „{listingTitle}”.
-      </p>
+    <RootiePageShell
+      eyebrow="Hodnotenie"
+      title="Napísať recenziu"
+      description={
+        <>
+          Hodnotíte predajcu <strong>{sellerName}</strong> za inzerát „{listingTitle}”.
+        </>
+      }
+    >
       <SubmitReviewForm
         sellerId={sellerId}
         listingId={listingId}
         threadId={threadId}
       />
-    </div>
+    </RootiePageShell>
   );
 }

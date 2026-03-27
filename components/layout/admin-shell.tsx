@@ -10,9 +10,9 @@ type AdminShellProps = {
  */
 export function AdminShell({ children }: AdminShellProps) {
   return (
-    <div className="bg-muted/25 min-h-dvh">
-      <div className="bg-background mx-auto flex min-h-dvh w-full max-w-md flex-col border-x shadow-sm">
-        <header className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-40 border-b backdrop-blur">
+    <div className="min-h-dvh">
+      <div className="mx-auto flex min-h-dvh w-full max-w-md flex-col">
+        <header className="bg-background/95 supports-[backdrop-filter]:bg-background/80 sticky top-0 z-40 border-b border-[#e9e2d1] backdrop-blur">
           <div className="flex h-14 items-center justify-between px-4">
             <div className="flex items-center gap-2">
               <Shield className="size-5 text-muted-foreground" aria-hidden />
@@ -20,7 +20,7 @@ export function AdminShell({ children }: AdminShellProps) {
             </div>
             <Link
               href="/"
-              className="text-muted-foreground hover:text-foreground inline-flex min-h-11 items-center gap-1.5 rounded-md px-2 text-sm font-medium transition-colors"
+              className="text-muted-foreground hover:text-foreground inline-flex min-h-11 items-center gap-1.5 rounded-[14px] px-2 text-sm font-medium transition-colors"
             >
               <ArrowLeft className="size-4" aria-hidden />
               Späť do aplikácie
@@ -32,7 +32,7 @@ export function AdminShell({ children }: AdminShellProps) {
           >
             <Link
               href="/admin/reports"
-              className="bg-primary text-primary-foreground inline-flex min-h-10 items-center gap-2 rounded-md px-3 text-sm font-medium"
+              className="bg-primary text-primary-foreground inline-flex min-h-10 items-center gap-2 rounded-[14px] px-3 text-sm font-medium shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
             >
               <Flag className="size-4" aria-hidden />
               Nahlásenia

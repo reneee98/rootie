@@ -157,7 +157,7 @@ export function AuctionBidPanel({
 
   /* ---- Render ---- */
   return (
-    <div className="space-y-4 rounded-lg border p-4">
+    <div className="rootie-surface space-y-4 p-4">
       <h2 className="flex items-center gap-1.5 text-sm font-semibold">
         <Gavel className="size-4" aria-hidden />
         Aukcia
@@ -214,7 +214,7 @@ export function AuctionBidPanel({
                 }}
                 disabled={!isAuthenticated || isPending}
                 placeholder={`min. ${formatPrice(minBid)}`}
-                className="h-12 w-full rounded-lg border border-input bg-background pl-10 pr-4 text-base font-semibold outline-none focus:border-ring focus:ring-ring/50 focus:ring-[3px] disabled:opacity-50"
+                className="rootie-field h-12 pl-10 pr-4 text-base font-semibold disabled:opacity-50"
                 aria-label="Suma ponuky"
               />
             </div>

@@ -69,7 +69,7 @@ export function ReportListingDialog({
           <select
             id="report-listing-reason"
             name="reason"
-            className="border-input bg-background focus-visible:ring-ring flex h-11 w-full rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2"
+            className="rootie-field"
             required
           >
             {Object.entries(REASON_LABELS).map(([value, label]) => (
@@ -89,7 +89,7 @@ export function ReportListingDialog({
             name="details"
             placeholder="Popis problému…"
             rows={3}
-            className="border-input focus-visible:ring-ring w-full resize-y rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] md:text-sm"
+            className="rootie-textarea text-base md:text-sm"
           />
           {reportState?.ok === false && (
             <p className="text-destructive text-sm">{reportState.error}</p>

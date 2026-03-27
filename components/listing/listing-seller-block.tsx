@@ -1,12 +1,7 @@
-"use client";
-
-import { useState } from "react";
 import Link from "next/link";
-import { ShieldCheck, Star, Flag } from "lucide-react";
+import { ArrowRight, Star } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
-import { ReportListingDialog } from "@/components/listing/report-listing-dialog";
 
 type Seller = {
   id: string;
@@ -20,18 +15,9 @@ type Seller = {
 
 type ListingSellerBlockProps = {
   seller: Seller;
-  listingId: string;
-  isOwnListing: boolean;
-  isAuthenticated: boolean;
 };
 
-export function ListingSellerBlock({
-  seller,
-  listingId,
-  isOwnListing,
-  isAuthenticated,
-}: ListingSellerBlockProps) {
-  const [reportOpen, setReportOpen] = useState(false);
+export function ListingSellerBlock({ seller }: ListingSellerBlockProps) {
   const name = seller.display_name?.trim() || "Používateľ";
   const initials = name
     .split(" ")
@@ -40,66 +26,42 @@ export function ListingSellerBlock({
     .join("") || "?";
   const ratingLabel =
     seller.ratings_count > 0 && seller.ratings_avg != null
-      ? `${Number(seller.ratings_avg).toFixed(1)}`
+      ? `${Number(seller.ratings_avg).toFixed(1).replace(".", ",")}`
       : null;
 
   return (
-    <div className="rounded-xl border bg-card p-4">
-      <div className="flex items-center gap-3">
-        <Avatar className="size-12 shrink-0">
-          {seller.avatar_url ? (
-            <AvatarImage src={seller.avatar_url} alt={name} />
-          ) : null}
-          <AvatarFallback className="text-sm">{initials}</AvatarFallback>
-        </Avatar>
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1.5">
-            <span className="truncate font-semibold">{name}</span>
-            {seller.phone_verified && (
-              <ShieldCheck
-                className="text-primary size-4 shrink-0"
-                aria-label="Overený telefón"
-              />
-            )}
-          </div>
-          <div className="text-muted-foreground flex items-center gap-2 text-sm">
-            {ratingLabel && (
-              <span className="inline-flex items-center gap-0.5">
-                <Star className="size-3.5 fill-current" aria-hidden />
-                {ratingLabel}
-                <span className="text-muted-foreground/80">
-                  ({seller.ratings_count})
-                </span>
-              </span>
-            )}
-            {seller.region && <span>{seller.region}</span>}
-          </div>
+    <div className="flex h-[72px] items-center gap-2.5 rounded-[14px] bg-[#f1ece1] px-3">
+      <Avatar className="size-11 shrink-0 bg-[#e5decc]">
+        {seller.avatar_url ? (
+          <AvatarImage src={seller.avatar_url} alt={name} />
+        ) : null}
+        <AvatarFallback className="text-[13px] font-medium text-[#8f9036]">
+          {initials}
+        </AvatarFallback>
+      </Avatar>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-[14px] font-semibold leading-[18px] text-[#1a2e1a]">
+          {name}
+        </p>
+        <div className="mt-1 flex items-center gap-1">
+          <Star className="size-[10px] fill-[#e0a500] text-[#e0a500]" aria-hidden />
+          {ratingLabel ? (
+            <>
+              <span className="text-[10px] font-bold leading-[12px] text-[#232711]">{ratingLabel}</span>
+              <span className="text-[10px] leading-[12px] text-[#c8c2b4]">({seller.ratings_count})</span>
+            </>
+          ) : (
+            <span className="text-[10px] leading-[12px] text-[#c8c2b4]">Nový predajca</span>
+          )}
         </div>
       </div>
-      <div className="mt-4 flex gap-2">
-        <Button variant="outline" size="sm" className="min-h-11 flex-1" asChild>
-          <Link href={`/profile/${seller.id}`}>Profil</Link>
-        </Button>
-        {!isOwnListing && isAuthenticated && (
-          <>
-            <ReportListingDialog
-              listingId={listingId}
-              open={reportOpen}
-              onOpenChange={setReportOpen}
-            />
-            <Button
-              variant="outline"
-              size="sm"
-              className="min-h-11 shrink-0"
-              onClick={() => setReportOpen(true)}
-              aria-label="Nahlásiť inzerát"
-            >
-              <Flag className="size-4" aria-hidden />
-              Nahlásiť
-            </Button>
-          </>
-        )}
-      </div>
+      <Link
+        href={`/profile/${seller.id}`}
+        className="inline-flex items-center gap-[2px] text-[12px] font-medium leading-[16px] text-[#4f5826]"
+      >
+        Profil
+        <ArrowRight className="size-[14px]" aria-hidden />
+      </Link>
     </div>
   );
 }

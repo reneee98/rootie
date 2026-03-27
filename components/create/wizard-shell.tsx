@@ -366,8 +366,8 @@ export function WizardShell({ userId, defaultRegion }: Props) {
   return (
     <div className="flex flex-col">
       {/* ---- Progress header ---- */}
-      <div className="px-0 pb-2">
-        <div className="flex items-center justify-between mb-2">
+      <div className="rootie-page-header pb-3">
+        <div className="mb-2 flex items-center justify-between">
           <h1 className="text-lg font-semibold">Nový inzerát</h1>
           {(draft.plantName || draft.photos.length > 0) && (
             <button
@@ -400,13 +400,13 @@ export function WizardShell({ userId, defaultRegion }: Props) {
       <div className="flex-1 py-6 pb-24">{renderStep()}</div>
 
       {/* ---- Fixed footer navigation ---- */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t">
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#e9e2d1] bg-background">
         <div className="mx-auto max-w-md px-4 py-3 flex gap-3">
           {step > 0 && (
             <button
               onClick={handleBack}
               type="button"
-              className={`h-12 rounded-lg border border-input text-sm font-medium ${
+              className={`h-12 rounded-[18px] border border-input bg-card px-4 text-sm font-medium shadow-[0_2px_6px_rgba(0,0,0,0.03)] ${
                 step === TOTAL_STEPS - 1 ? "w-auto px-6" : "flex-1"
               }`}
             >
@@ -418,7 +418,7 @@ export function WizardShell({ userId, defaultRegion }: Props) {
             <button
               onClick={handleNext}
               type="button"
-              className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground text-sm font-medium"
+              className="h-12 flex-1 rounded-[18px] bg-primary text-sm font-medium text-primary-foreground shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
             >
               Ďalej
             </button>
@@ -427,7 +427,7 @@ export function WizardShell({ userId, defaultRegion }: Props) {
               onClick={handlePublish}
               disabled={isPublishing}
               type="button"
-              className="flex-1 h-12 rounded-lg bg-primary text-primary-foreground text-sm font-medium disabled:opacity-50"
+              className="h-12 flex-1 rounded-[18px] bg-primary text-sm font-medium text-primary-foreground shadow-[0_2px_6px_rgba(0,0,0,0.06)] disabled:opacity-50"
             >
               {isPublishing ? (
                 <span className="flex items-center justify-center gap-2">

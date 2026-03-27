@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { getReviewableListings } from "@/lib/data/reviews";
 import { getProfileByUserId } from "@/lib/data/profile";
 import { Button } from "@/components/ui/button";
+import { RootiePageShell } from "@/components/layout/rootie-page-shell";
 
 type ReviewPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -29,24 +30,29 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
 
   if (reviewable.length === 0) {
     return (
-      <div className="space-y-4 py-6">
-        <h1 className="text-lg font-semibold">Napísať recenziu</h1>
-        <p className="text-muted-foreground text-sm">
-          Nemáte žiadny inzerát tohto predajcu ({sellerName}), za ktorý by ste mohli napísať recenziu. Recenziu môžete napísať až po potvrdení stavu objednávky „Doručené“.
-        </p>
-        <Button asChild variant="outline">
-          <Link href={`/profile/${sellerId}`}>Späť na profil</Link>
-        </Button>
-      </div>
+      <RootiePageShell
+        eyebrow="Hodnotenie"
+        title="Napísať recenziu"
+        description={`Recenzie sa dajú pridávať po doručení objednávky od používateľa ${sellerName}.`}
+      >
+        <div className="rootie-surface space-y-3 p-4">
+          <p className="text-muted-foreground text-sm">
+            Nemáte žiadny inzerát tohto predajcu ({sellerName}), za ktorý by ste mohli napísať recenziu. Recenziu môžete napísať až po potvrdení stavu objednávky „Doručené“.
+          </p>
+          <Button asChild variant="outline">
+            <Link href={`/profile/${sellerId}`}>Späť na profil</Link>
+          </Button>
+        </div>
+      </RootiePageShell>
     );
   }
 
   return (
-    <div className="space-y-4 py-6">
-      <h1 className="text-lg font-semibold">Napísať recenziu pre {sellerName}</h1>
-      <p className="text-muted-foreground text-sm">
-        Vyberte inzerát, za ktorý chcete napísať recenziu:
-      </p>
+    <RootiePageShell
+      eyebrow="Hodnotenie"
+      title={`Napísať recenziu pre ${sellerName}`}
+      description="Vyberte inzerát, ktorý chcete ohodnotiť."
+    >
       <ul className="flex flex-col gap-2" role="list">
         {reviewable.map((r) => (
           <li key={r.listingId}>
@@ -63,6 +69,6 @@ export default async function ReviewPage({ searchParams }: ReviewPageProps) {
       <Button asChild variant="ghost" size="sm">
         <Link href={`/profile/${sellerId}`}>Späť na profil</Link>
       </Button>
-    </div>
+    </RootiePageShell>
   );
 }

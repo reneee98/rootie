@@ -1,8 +1,9 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { Home, MessageCircle, Plus, Search, User } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
@@ -18,132 +19,85 @@ function isActive(pathname: string, href: string) {
 function NavItem({
   href,
   label,
-  iconSrc,
   active,
-  iconClassName = "size-6",
-  showBadge = false,
+  icon: Icon,
 }: {
   href: string;
   label: string;
-  iconSrc: string;
   active: boolean;
-  iconClassName?: string;
-  showBadge?: boolean;
+  icon: LucideIcon;
 }) {
   return (
     <Link
       href={href}
       className={cn(
-        "flex w-full flex-col items-center gap-[6px] px-[11px] py-[10px]",
-        active ? "text-[#4f5826]" : "text-[#4f5826]/50"
+        "flex h-[62px] flex-col items-center justify-center gap-1 px-1 py-1.5 text-center",
+        active ? "text-[#4f5826]" : "text-[#7d816d]"
       )}
       aria-current={active ? "page" : undefined}
     >
-      <span className="relative inline-flex h-6 w-6 items-center justify-center">
-        <Image
-          src={iconSrc}
-          alt=""
-          width={24}
-          height={24}
-          className={cn(iconClassName, "object-contain", active ? "opacity-100" : "opacity-50")}
-        />
-        {showBadge ? (
-          <span className="absolute -right-[4px] -top-[5px] inline-flex h-[14px] min-w-4 items-center justify-center rounded-[999px] bg-[#fb2c36] px-[5px] text-center text-[9px] leading-[9px] font-bold text-white">
-            3
-          </span>
-        ) : null}
+      <span className="inline-flex h-[30px] w-[30px] items-center justify-center">
+        <span
+          className={cn(
+            "inline-flex size-[30px] items-center justify-center rounded-full transition-colors",
+            active ? "bg-[#ece9de]" : "bg-transparent"
+          )}
+        >
+          <Icon className="size-[17px]" aria-hidden />
+        </span>
       </span>
-      <span className="text-[10px] font-medium leading-[14px]">{label}</span>
+      <span className="text-[10px] font-medium leading-[12px]">{label}</span>
     </Link>
   );
 }
 
-export function HomeBottomNav({
-  isAuthenticated = false,
-}: HomeBottomNavProps) {
+export function HomeBottomNav({ isAuthenticated = false }: HomeBottomNavProps) {
   const pathname = usePathname();
   const inboxHref = isAuthenticated ? "/inbox" : "/login";
   const profileHref = isAuthenticated ? "/me" : "/login";
   const createHref = isAuthenticated ? "/create" : "/login";
+
   const homeActive = isActive(pathname, "/");
   const wantedActive = isActive(pathname, "/wanted");
-  const inboxActive = isActive(pathname, inboxHref);
-  const profileActive = isActive(pathname, profileHref);
-
-  const indicatorLeft = homeActive
-    ? "calc(10% - 19.5px)"
-    : wantedActive
-      ? "calc(30% - 19.5px)"
-      : inboxActive
-        ? "calc(70% - 19.5px)"
-        : profileActive
-          ? "calc(90% - 19.5px)"
-          : "calc(10% - 19.5px)";
+  const createActive = isActive(pathname, "/create");
+  const inboxActive = isActive(pathname, "/inbox");
+  const profileActive = isActive(pathname, "/me");
 
   return (
     <nav
       aria-label="Primary"
-      className="fixed inset-x-0 bottom-0 z-50 pb-[env(safe-area-inset-bottom)]"
+      className="pointer-events-none fixed inset-x-0 bottom-0 z-50 pb-[max(env(safe-area-inset-bottom),8px)]"
     >
-      <div className="relative h-[124px] w-full">
-        <Image
-          src="/figma-home/nav-3284-shell.svg"
-          alt=""
-          width={1440}
-          height={92}
-          className="pointer-events-none absolute left-0 top-8 h-[92px] w-full"
-          priority
-        />
-        <div
-          className="pointer-events-none absolute top-8 h-1 w-[39px] rounded-[30px] bg-[#c4c35b] transition-all duration-200"
-          style={{ left: indicatorLeft }}
-        />
+      <div className="pointer-events-auto mx-auto w-full max-w-md px-3">
+        <div className="rounded-[20px] border border-[#e4dfd2] bg-[#faf8f4]/95 shadow-[0_10px_30px_rgba(0,0,0,0.12)] backdrop-blur">
+          <div className="grid grid-cols-5 items-center px-1 py-1.5">
+            <NavItem href="/" label="Domov" active={homeActive} icon={Home} />
+            <NavItem href="/wanted" label="Hľadám" active={wantedActive} icon={Search} />
 
-        <div className="absolute inset-x-0 top-[43px] grid grid-cols-5 items-center">
-          <NavItem
-            href="/"
-            label="Domov"
-            iconSrc="/figma-home/nav-3284-home.svg"
-            active={homeActive}
-          />
-          <NavItem
-            href="/wanted"
-            label="Hľadám"
-            iconSrc="/figma-home/nav-3284-search.svg"
-            active={wantedActive}
-          />
-          <div />
-          <NavItem
-            href={inboxHref}
-            label="Správy"
-            iconSrc="/figma-home/nav-3284-inbox.svg"
-            active={inboxActive}
-            showBadge={isAuthenticated}
-          />
-          <NavItem
-            href={profileHref}
-            label="Profil"
-            iconSrc="/figma-home/nav-3297-profile.svg"
-            active={profileActive}
-            iconClassName="h-[19.5px] w-[15.5px]"
-          />
+            <Link
+              href={createHref}
+              className={cn(
+                "flex h-[62px] items-center justify-center px-1 py-1.5",
+                createActive ? "text-[#4f5826]" : "text-[#7d816d]"
+              )}
+              aria-current={createActive ? "page" : undefined}
+              aria-label="Pridať inzerát"
+            >
+              <span
+                className={cn(
+                  "inline-flex h-[44px] w-[44px] items-center justify-center rounded-full shadow-[0_6px_14px_rgba(79,88,38,0.35)]",
+                  createActive ? "bg-[#3f491f]" : "bg-[#4f5826]"
+                )}
+              >
+                <Plus className="size-[20px] text-[#f3f0e7]" aria-hidden />
+              </span>
+              <span className="sr-only">Pridať</span>
+            </Link>
+
+            <NavItem href={inboxHref} label="Správy" active={inboxActive} icon={MessageCircle} />
+            <NavItem href={profileHref} label="Profil" active={profileActive} icon={User} />
+          </div>
         </div>
-
-        <Link
-          href={createHref}
-          aria-label="Pridať inzerát"
-          className="absolute left-1/2 top-0 inline-flex min-h-[44px] min-w-[44px] size-[76px] -translate-x-1/2 items-center justify-center"
-        >
-          <Image src="/figma-home/nav-3284-fab-shadow.svg" alt="" fill className="object-contain" />
-          <Image
-            src="/figma-home/nav-3284-plus.svg"
-            alt=""
-            width={20}
-            height={20}
-            className="relative z-10 size-5 -translate-y-[11px]"
-          />
-        </Link>
-
       </div>
     </nav>
   );

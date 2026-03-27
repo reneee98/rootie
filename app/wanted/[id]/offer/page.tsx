@@ -7,6 +7,7 @@ import { getWantedThreadIdIfExists } from "@/lib/actions/wanted-thread";
 import { createWantedThreadWithOffer } from "@/lib/actions/wanted-thread";
 import { OfferForm } from "@/components/offers/offer-form";
 import { Button } from "@/components/ui/button";
+import { RootiePageShell } from "@/components/layout/rootie-page-shell";
 
 type WantedOfferPageProps = {
   params: Promise<{ id: string }>;
@@ -37,25 +38,28 @@ export default async function WantedOfferPage({ params }: WantedOfferPageProps) 
   }
 
   return (
-    <div className="space-y-6 pb-8">
-      <div className="flex items-center gap-2">
+    <RootiePageShell
+      eyebrow="Ponuka"
+      title="Poslať ponuku"
+      description={
+        <>
+          Ohľadom: <strong>{wanted.plant_name}</strong>
+        </>
+      }
+      actions={
         <Button variant="ghost" size="icon" asChild aria-label="Späť">
           <Link href={`/wanted/${id}`}>
             <ArrowLeft className="size-5" aria-hidden />
           </Link>
         </Button>
-        <h1 className="text-lg font-semibold">Poslať ponuku</h1>
-      </div>
-      <p className="text-muted-foreground text-sm">
-        Ohľadom: <strong>{wanted.plant_name}</strong>
-      </p>
-
+      }
+    >
       <OfferForm
         context="wanted"
         contextId={id}
         submitAction={createWantedThreadWithOffer}
         backHref={`/wanted/${id}`}
       />
-    </div>
+    </RootiePageShell>
   );
 }

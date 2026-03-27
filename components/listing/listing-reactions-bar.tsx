@@ -94,7 +94,7 @@ export function ListingReactionsBar({
         <button
           type="button"
           className={cn(
-            "flex flex-wrap items-center gap-2 rounded-xl border border-input bg-muted/30 px-4 py-3 text-left transition-colors hover:bg-muted/50",
+            "rootie-surface flex flex-wrap items-center gap-2 bg-muted/30 px-4 py-3 text-left transition-colors hover:bg-muted/50",
             totalCount > 0 && "min-h-11"
           )}
           aria-label="Pridať alebo zmeniť reakciu"

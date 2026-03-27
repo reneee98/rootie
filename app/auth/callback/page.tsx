@@ -58,7 +58,7 @@ export default function AuthCallbackPage() {
 
   return (
     <div className="bg-background flex min-h-dvh flex-col items-center justify-center px-6">
-      <div className="mx-auto w-full max-w-sm text-center">
+      <div className="rootie-surface mx-auto w-full max-w-sm px-5 py-8 text-center">
         {status === "loading" && (
           <p className="text-muted-foreground text-sm" role="status">
             Potvrdzujem účet…

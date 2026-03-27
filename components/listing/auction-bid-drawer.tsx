@@ -39,9 +39,8 @@ export function AuctionBidDrawer({
     <Drawer open={open} onOpenChange={setOpen} direction="bottom">
       <DrawerTrigger asChild>
         <Button
-          variant="secondary"
-          size="sm"
-          className="min-h-11 w-full gap-1.5"
+          size="lg"
+          className="h-[49px] w-full gap-[8.75px] rounded-[14px] bg-[#c4c35b] text-[14px] font-medium text-[#4f5826] shadow-[0_2px_6px_rgba(0,0,0,0.1)] hover:bg-[#c4c35b]/90"
           aria-label="Pridať príhoz"
         >
           <Gavel className="size-4" aria-hidden />

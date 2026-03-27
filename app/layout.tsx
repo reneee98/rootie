@@ -1,19 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Rubik } from "next/font/google";
 
 import { LayoutShell } from "@/components/layout/layout-shell";
 import { getUser } from "@/lib/auth";
 
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
+const rubik = Rubik({
+  variable: "--font-rubik",
+  subsets: ["latin", "latin-ext"],
+  weight: ["400", "500", "700"],
 });
 
 export const metadata: Metadata = {
@@ -31,7 +27,7 @@ export default async function RootLayout({
 
   return (
     <html lang="sk">
-      <body className={`${geistSans.variable} ${geistMono.variable} antialiased`}>
+      <body className={`${rubik.variable} antialiased`}>
         <LayoutShell isAuthenticated={isAuthenticated}>
           {children}
         </LayoutShell>

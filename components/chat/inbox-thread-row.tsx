@@ -57,7 +57,7 @@ export function InboxThreadRow({ thread }: InboxThreadRowProps) {
     <Link
       href={`/chat/${thread.id}`}
       className={cn(
-        "focus-visible:ring-ring flex gap-3 rounded-lg border bg-card p-3 outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2"
+        "rootie-surface focus-visible:ring-ring flex gap-3 p-3 outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2"
       )}
       aria-label={
         thread.context_preview.type === "listing"

@@ -99,7 +99,7 @@ export function PhoneVerificationSection({
   };
 
   return (
-    <div className="space-y-4 rounded-lg border p-4">
+    <div className="rootie-surface space-y-4 p-4">
       <div className="flex items-center gap-2">
         <Smartphone className="text-muted-foreground size-5" aria-hidden />
         <h2 className="text-sm font-semibold">Telefón a overenie</h2>

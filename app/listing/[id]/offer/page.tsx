@@ -7,6 +7,7 @@ import { getListingThreadIdIfExists } from "@/lib/actions/listing-thread";
 import { createListingThreadWithOffer } from "@/lib/actions/listing-thread";
 import { OfferForm } from "@/components/offers/offer-form";
 import { Button } from "@/components/ui/button";
+import { RootiePageShell } from "@/components/layout/rootie-page-shell";
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 
 type ListingOfferPageProps = {
@@ -53,25 +54,28 @@ export default async function ListingOfferPage({
   }
 
   return (
-    <div className="space-y-6 pb-8">
-      <div className="flex items-center gap-2">
+    <RootiePageShell
+      eyebrow="Ponuka"
+      title="Reagovať na inzerát"
+      description={
+        <>
+          Ohľadom: <strong>{listing.plant_name}</strong>
+        </>
+      }
+      actions={
         <Button variant="ghost" size="icon" asChild aria-label="Späť">
           <Link href={`/listing/${id}`}>
             <ArrowLeft className="size-5" aria-hidden />
           </Link>
         </Button>
-        <h1 className="text-lg font-semibold">Reagovať na ponuku</h1>
-      </div>
-      <p className="text-muted-foreground text-sm">
-        Ohľadom: <strong>{listing.plant_name}</strong>
-      </p>
-
+      }
+    >
       <OfferForm
         context="listing"
         contextId={id}
         submitAction={createListingThreadWithOffer}
         backHref={`/listing/${id}`}
       />
-    </div>
+    </RootiePageShell>
   );
 }

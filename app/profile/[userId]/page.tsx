@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ListingGrid } from "@/components/profile/listing-grid";
 import { ProfileActions } from "@/components/profile/profile-actions";
+import { RootiePageShell } from "@/components/layout/rootie-page-shell";
 import {
   getProfileByUserId,
   getActiveListingsBySeller,
@@ -56,7 +57,12 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       : "Zatiaľ žiadne hodnotenia";
 
   return (
-    <div className="space-y-6 pb-6">
+    <RootiePageShell
+      eyebrow="Predajca"
+      title={displayName}
+      description={location ?? "Profil bez vyplnenej lokality."}
+      contentClassName="space-y-6"
+    >
       <Card>
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
@@ -75,9 +81,6 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
                   </Badge>
                 )}
               </div>
-              {location ? (
-                <p className="text-muted-foreground text-sm">{location}</p>
-              ) : null}
               <p className="text-muted-foreground text-sm" aria-label="Hodnotenie">
                 {ratingLabel}
               </p>
@@ -101,11 +104,11 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       </Card>
 
       <section aria-labelledby="listings-heading">
-        <h2 id="listings-heading" className="mb-3 text-lg font-semibold">
+        <h2 id="listings-heading" className="rootie-page-title mb-3">
           Aktívne inzeráty
         </h2>
         <ListingGrid listings={listings} />
       </section>
-    </div>
+    </RootiePageShell>
   );
 }

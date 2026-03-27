@@ -26,8 +26,9 @@ export function LayoutShell({
   const isAdminRoute = pathname?.startsWith("/admin") ?? false;
   const onAuthRoute = isAuthRoute(pathname ?? "");
   const isStandaloneHome = pathname === "/";
+  const isStandaloneSearch = pathname === "/search";
 
-  if (isAdminRoute || onAuthRoute || isStandaloneHome) {
+  if (isAdminRoute || onAuthRoute || isStandaloneHome || isStandaloneSearch) {
     return <>{children}</>;
   }
 

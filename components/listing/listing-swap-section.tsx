@@ -20,7 +20,7 @@ export function ListingSwapSection({
   return (
     <div
       className={cn(
-        "rounded-xl border border-primary/20 bg-primary/5 p-4",
+        "rootie-surface border-primary/20 bg-primary/5 p-4",
         className
       )}
     >

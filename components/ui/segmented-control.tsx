@@ -28,7 +28,7 @@ function SegmentedControl<T extends string>({
       role="group"
       aria-label={ariaLabel}
       className={cn(
-        "inline-flex min-h-[44px] w-full rounded-lg border border-input bg-muted/50 p-1",
+        "inline-flex min-h-[44px] w-full rounded-[18px] border border-[#e9e2d1] bg-[#f1ece1] p-1",
         className
       )}
     >
@@ -44,7 +44,7 @@ function SegmentedControl<T extends string>({
               "flex-1 rounded-md py-2.5 text-sm font-medium transition-colors touch-manipulation",
               "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
               isSelected
-                ? "bg-primary text-primary-foreground shadow-sm"
+                ? "rounded-[14px] bg-primary text-primary-foreground shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
                 : "text-muted-foreground hover:text-foreground"
             )}
             onClick={() => onValueChange(opt.value)}

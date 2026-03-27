@@ -236,32 +236,63 @@ export async function getListingsFeed(
   let listingRows: Record<string, unknown>[] = [];
 
   if (sort === "trending") {
-    const region =
-      filters.region && filters.region !== "All Slovakia"
-        ? filters.region
-        : null;
-    let trendQ = supabase
-      .from("listing_trending_scores")
-      .select("listing_id")
-      .eq("status", PUBLIC_LISTING_STATUS)
-      .order("trending_score", { ascending: false })
-      .range(from, to);
-    if (region) {
-      trendQ = trendQ.eq("region", region);
-    }
-    const { data: trendRows, error: trendErr } = await trendQ;
-    if (trendErr || !trendRows?.length) {
+    // Trending is defined by how many users saved (hearted) the listing.
+    // Tiebreaker: newer listing first.
+    let candidatesQ = supabase
+      .from("listings")
+      .select("id, created_at")
+      .eq("status", PUBLIC_LISTING_STATUS);
+
+    candidatesQ = applyCommonFilters(candidatesQ);
+
+    const { data: candidateRows, error: candidateErr } = await candidatesQ;
+    if (candidateErr || !candidateRows?.length) {
       return { listings: [], hasMore: false };
     }
 
-    const orderedIds = trendRows.map((row) => row.listing_id as string);
-    let listQ = supabase
+    const candidateIds = candidateRows.map((row) => row.id as string);
+    const { data: savedRows, error: savedErr } = await supabase
+      .from("saved_listings")
+      .select("listing_id")
+      .in("listing_id", candidateIds);
+
+    if (savedErr) {
+      return { listings: [], hasMore: false };
+    }
+
+    const savesByListingId = new Map<string, number>();
+    for (const id of candidateIds) {
+      savesByListingId.set(id, 0);
+    }
+    for (const row of savedRows ?? []) {
+      const listingId = row.listing_id as string;
+      savesByListingId.set(listingId, (savesByListingId.get(listingId) ?? 0) + 1);
+    }
+
+    const orderedIds = [...candidateRows]
+      .sort((a, b) => {
+        const aId = a.id as string;
+        const bId = b.id as string;
+        const aSaves = savesByListingId.get(aId) ?? 0;
+        const bSaves = savesByListingId.get(bId) ?? 0;
+        if (aSaves !== bSaves) return bSaves - aSaves;
+
+        const aCreated = new Date((a.created_at as string) ?? "").getTime();
+        const bCreated = new Date((b.created_at as string) ?? "").getTime();
+        return bCreated - aCreated;
+      })
+      .map((row) => row.id as string)
+      .slice(from, to + 1);
+
+    if (orderedIds.length === 0) {
+      return { listings: [], hasMore: false };
+    }
+
+    const listQ = supabase
       .from("listings")
       .select(listingSelect)
       .eq("status", PUBLIC_LISTING_STATUS)
       .in("id", orderedIds);
-
-    listQ = applyCommonFilters(listQ, { skipRegion: true });
 
     const { data, error } = await listQ;
     if (error || !data?.length) {

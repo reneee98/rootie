@@ -81,7 +81,7 @@ export function OfferForm({
         <fieldset className="space-y-3">
           <legend className="text-sm font-medium">Typ ponuky</legend>
           <div className="flex gap-3">
-            <label className="border-input focus-within:ring-ring flex flex-1 cursor-pointer items-center gap-2 rounded-lg border p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+            <label className="rootie-surface focus-within:ring-ring flex flex-1 cursor-pointer items-center gap-2 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
               <input
                 type="radio"
                 name="offerType"
@@ -94,7 +94,7 @@ export function OfferForm({
               <Euro className="size-4 shrink-0" aria-hidden />
               <span className="text-sm font-medium">Ponuka ceny</span>
             </label>
-            <label className="border-input focus-within:ring-ring flex flex-1 cursor-pointer items-center gap-2 rounded-lg border p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
+            <label className="rootie-surface focus-within:ring-ring flex flex-1 cursor-pointer items-center gap-2 p-3 has-[:checked]:border-primary has-[:checked]:bg-primary/5">
               <input
                 type="radio"
                 name="offerType"
@@ -135,7 +135,7 @@ export function OfferForm({
             </label>
             <textarea
               id="offer-swap"
-              className="border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-[100px] w-full rounded-md border px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 disabled:cursor-not-allowed disabled:opacity-50"
+              className="rootie-textarea placeholder:text-muted-foreground flex min-h-[100px] disabled:cursor-not-allowed disabled:opacity-50"
               placeholder="Napríklad: Monstera deliciosa, odnož v 12 cm pot…"
               value={swapBody}
               onChange={(e) => setSwapBody(e.target.value)}

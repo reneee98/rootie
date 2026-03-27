@@ -116,7 +116,7 @@ export function ChatHeader({ thread }: ChatHeaderProps) {
                 aria-hidden
                 onClick={() => setMenuOpen(false)}
               />
-              <div className="border-input bg-background absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border py-1 shadow-lg">
+              <div className="rootie-surface absolute right-0 top-full z-20 mt-1 w-48 py-1">
                 <button
                   type="button"
                   className="hover:bg-muted flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left text-sm"
@@ -159,7 +159,7 @@ export function ChatHeader({ thread }: ChatHeaderProps) {
               id="chat-report-reason"
               value={reportReason}
               onChange={(e) => setReportReason(e.target.value)}
-              className="border-input bg-background h-11 w-full rounded-md border px-3 py-2 text-sm"
+              className="rootie-field"
             >
               {REPORT_REASONS.map((r) => (
                 <option key={r.value} value={r.value}>
@@ -176,7 +176,7 @@ export function ChatHeader({ thread }: ChatHeaderProps) {
               onChange={(e) => setReportDetails(e.target.value)}
               placeholder="Popis problému…"
               rows={3}
-              className="border-input bg-background w-full resize-y rounded-md border px-3 py-2 text-sm"
+              className="rootie-textarea"
             />
             {reportState === "success" && (
               <p className="text-sm text-emerald-600">Nahlásenie odoslané.</p>

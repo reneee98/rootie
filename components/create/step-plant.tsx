@@ -86,8 +86,8 @@ export function StepPlant({ draft, updateDraft, errors }: StepProps) {
               if (results.length > 0) setShowDropdown(true);
             }}
             placeholder="napr. Monstera deliciosa"
-            className={`h-12 w-full rounded-lg border bg-background pl-10 pr-4 text-base outline-none focus:border-ring focus:ring-ring/50 focus:ring-[3px] ${
-              errors.plantName ? "border-destructive" : "border-input"
+            className={`rootie-field h-12 pl-10 pr-4 text-base ${
+              errors.plantName ? "border-destructive" : ""
             }`}
             aria-label="Názov rastliny"
             aria-invalid={!!errors.plantName}
@@ -108,7 +108,7 @@ export function StepPlant({ draft, updateDraft, errors }: StepProps) {
           <div
             id="plant-autocomplete-listbox"
             role="listbox"
-            className="absolute z-20 mt-1 w-full rounded-lg border bg-background shadow-lg max-h-60 overflow-y-auto"
+            className="rootie-surface absolute z-20 mt-1 max-h-60 w-full overflow-y-auto"
           >
             {results.map((taxon) => (
               <button

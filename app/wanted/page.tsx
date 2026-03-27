@@ -1,4 +1,5 @@
 import { Suspense } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { Plus } from "lucide-react";
 import { WantedFilters } from "@/components/wanted/wanted-filters";
@@ -50,10 +51,17 @@ export default async function WantedPage({ searchParams }: WantedPageProps) {
   const { items, hasMore } = await getWantedFeed(filters);
 
   return (
-    <div className="space-y-4 pb-24">
-      <div className="flex items-center justify-between gap-2">
-        <h1 className="text-lg font-semibold">Hľadám</h1>
-        <Button asChild size="sm">
+    <div className="rootie-page">
+      <div className="rootie-page-header flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <div className="flex h-[21px] items-center gap-[7px]">
+            <Image src="/figma-home/section-new.svg" alt="" width={18} height={18} className="size-[17.5px]" />
+            <p className="rootie-page-eyebrow">Hľadám rastliny</p>
+          </div>
+          <h1 className="rootie-page-title">Požiadavky komunity</h1>
+          <p className="rootie-page-description">Ľudia tu hľadajú konkrétne rastliny a výmeny.</p>
+        </div>
+        <Button asChild size="sm" className="h-[36px] rounded-[14px] px-3 text-[12px]">
           <Link href="/wanted/create">
             <Plus className="size-4" aria-hidden />
             Pridať
@@ -66,7 +74,7 @@ export default async function WantedPage({ searchParams }: WantedPageProps) {
       </Suspense>
 
       {items.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-center">
+        <div className="rootie-surface flex flex-col items-center gap-2 py-16 text-center">
           <p className="text-muted-foreground text-sm">
             Žiadne požiadavky pre zvolené filtre.
           </p>

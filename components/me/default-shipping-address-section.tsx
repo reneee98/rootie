@@ -31,7 +31,7 @@ export function DefaultShippingAddressSection({
   );
 
   return (
-    <form action={formAction} className="space-y-3 rounded-lg border p-4">
+    <form action={formAction} className="rootie-surface space-y-3 p-4">
       <div>
         <h2 className="text-sm font-semibold">Predvolená doručovacia adresa</h2>
         <p className="text-muted-foreground text-xs">

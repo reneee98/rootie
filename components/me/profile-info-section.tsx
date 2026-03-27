@@ -28,7 +28,7 @@ export function ProfileInfoSection({
   );
 
   return (
-    <form action={formAction} className="space-y-3 rounded-lg border p-4">
+    <form action={formAction} className="rootie-surface space-y-3 p-4">
       <div>
         <h2 className="text-sm font-semibold">Profil</h2>
         <p className="text-muted-foreground text-xs">
@@ -60,7 +60,7 @@ export function ProfileInfoSection({
           placeholder="Pár slov o tebe…"
           rows={3}
           maxLength={500}
-          className="border-input focus-visible:ring-ring w-full resize-y rounded-md border bg-transparent px-3 py-2 text-base shadow-xs outline-none focus-visible:border-ring focus-visible:ring-[3px] md:text-sm"
+          className="rootie-textarea text-base md:text-sm"
         />
       </div>
 

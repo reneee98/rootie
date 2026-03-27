@@ -4,6 +4,7 @@ import { requireUser } from "@/lib/auth";
 import { getSavedListings } from "@/lib/data/listings";
 import { FeedListingCardComponent } from "@/components/feed/feed-listing-card";
 import { SavedListingsFilters } from "@/components/saved/saved-listings-filters";
+import { RootiePageShell } from "@/components/layout/rootie-page-shell";
 
 type SavedPageProps = {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
@@ -20,16 +21,20 @@ export default async function SavedPage({ searchParams }: SavedPageProps) {
   const listings = await getSavedListings(user.id, region);
 
   return (
-    <div className="space-y-4">
-      <h1 className="flex items-center gap-2 text-lg font-semibold">
-        <Heart className="size-5 shrink-0 fill-current text-primary" aria-hidden />
-        Uložené inzeráty
-      </h1>
-
+    <RootiePageShell
+      eyebrow="Profil"
+      title={
+        <span className="inline-flex items-center gap-2">
+          <Heart className="size-5 shrink-0 fill-current text-primary" aria-hidden />
+          Uložené inzeráty
+        </span>
+      }
+      description="Všetko, čo si si označil srdiečkom."
+    >
       <SavedListingsFilters currentRegion={region} />
 
       {listings.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 py-16 text-center">
+        <div className="rootie-surface flex flex-col items-center gap-2 py-16 text-center">
           <p className="text-muted-foreground text-sm">
             Nemáte uložené žiadne inzeráty.
           </p>
@@ -48,6 +53,6 @@ export default async function SavedPage({ searchParams }: SavedPageProps) {
           ))}
         </div>
       )}
-    </div>
+    </RootiePageShell>
   );
 }

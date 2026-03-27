@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DefaultShippingAddressSection } from "@/components/me/default-shipping-address-section";
 import { ProfileInfoSection } from "@/components/me/profile-info-section";
+import { RootiePageShell } from "@/components/layout/rootie-page-shell";
 import { requireUser } from "@/lib/auth";
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { getProfileShippingAddress } from "@/lib/data/orders";
@@ -47,7 +48,12 @@ export default async function MePage() {
   const avatarUrl = user.user_metadata.avatar_url as string | undefined;
 
   return (
-    <div className="space-y-6 pb-6">
+    <RootiePageShell
+      eyebrow="Profil"
+      title="Môj účet"
+      description="Spravujte verejný profil, doručenie a bezpečnosť účtu."
+      contentClassName="space-y-6"
+    >
       <Card>
         <CardHeader className="space-y-4">
           <CardTitle>Účet</CardTitle>
@@ -82,6 +88,6 @@ export default async function MePage() {
           <SignOutButton />
         </CardContent>
       </Card>
-    </div>
+    </RootiePageShell>
   );
 }

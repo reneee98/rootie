@@ -1,8 +1,8 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
-import { ChevronDown, Filter, MapPin, Search, X } from "lucide-react";
+import { useCallback, useMemo, useState, useTransition } from "react";
+import { ChevronDown, MapPin } from "lucide-react";
 
 import { PLANT_QUICK_CATEGORIES } from "@/lib/plant-quick-categories";
 import { SLOVAK_REGIONS, getRegionShortLabel } from "@/lib/regions";
@@ -50,13 +50,8 @@ export function WantedFilters() {
   const currentIntent = parseIntent(searchParams.get("intent"));
   const currentQuery = (searchParams.get("q") || "").trim();
 
-  const [searchInput, setSearchInput] = useState(currentQuery);
   const [draftRegion, setDraftRegion] = useState(currentRegion);
   const [draftIntent, setDraftIntent] = useState<WantedIntent>(currentIntent);
-
-  useEffect(() => {
-    setSearchInput(currentQuery);
-  }, [currentQuery]);
 
   const updateParams = useCallback(
     (updates: Record<string, string>) => {
@@ -78,25 +73,11 @@ export function WantedFilters() {
     [router, searchParams, startTransition]
   );
 
-  const applySearch = useCallback(
-    (value: string) => {
-      const q = value.trim();
-      setSearchInput(q);
-      updateParams({ q });
-    },
-    [updateParams]
-  );
-
-  const clearSearch = useCallback(() => {
-    setSearchInput("");
-    updateParams({ q: "" });
-  }, [updateParams]);
-
   const openFilters = useCallback(() => {
     setDraftRegion(currentRegion);
     setDraftIntent(currentIntent);
     setFilterOpen(true);
-  }, [currentIntent, currentRegion]);
+  }, [currentIntent, currentRegion, setDraftIntent, setDraftRegion]);
 
   const applyDraftFilters = useCallback(() => {
     updateParams({
@@ -114,7 +95,7 @@ export function WantedFilters() {
       intent: "",
     });
     setFilterOpen(false);
-  }, [updateParams]);
+  }, [updateParams, setDraftIntent, setDraftRegion]);
 
   const setRegion = useCallback(
     (region: string) => {
@@ -137,47 +118,12 @@ export function WantedFilters() {
 
   return (
     <div className="space-y-3" data-pending={isPending || undefined}>
-      <div className="space-y-1.5">
-        <div className="relative">
-          <div className="border-input bg-background flex min-h-[44px] items-center rounded-full border px-3 py-1 shadow-sm">
-            <Search className="text-muted-foreground size-4 shrink-0" aria-hidden />
-            <input
-              value={searchInput}
-              onChange={(event) => setSearchInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  applySearch(searchInput);
-                }
-              }}
-              placeholder="Hľadať rastlinu… (Monstera, Hoya, Alocasia)"
-              className="h-11 min-h-[44px] w-full bg-transparent px-2 text-sm outline-none"
-              aria-label="Hľadať rastlinu"
-            />
-            {searchInput ? (
-              <button
-                type="button"
-                onClick={clearSearch}
-                className="text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-full"
-                aria-label="Odstrániť vyhľadávanie"
-              >
-                <X className="size-4" aria-hidden />
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        <p className="text-muted-foreground px-1 text-xs">
-          Tip: Skús napísať „mons“ a vyber z kategórií nižšie.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-[1fr_auto] gap-2">
+      <div className="flex items-center gap-2">
         <Button
           type="button"
           variant="outline"
           onClick={() => setRegionOpen(true)}
-          className="min-h-[44px] justify-between rounded-full px-3 text-sm"
+          className="h-[44px] justify-between rounded-[18px] border-[#c4c35b]/25 bg-[#faf8f4] px-3 text-[12px]"
           aria-label="Vybrať kraj"
         >
           <span className="inline-flex items-center gap-1.5">
@@ -186,22 +132,6 @@ export function WantedFilters() {
           </span>
           <ChevronDown className="size-4" aria-hidden />
         </Button>
-
-        <Button
-          type="button"
-          variant="outline"
-          onClick={openFilters}
-          className="relative min-h-[44px] min-w-[44px] rounded-full px-3"
-          aria-label="Otvoriť filtre"
-        >
-          <Filter className="size-4" aria-hidden />
-          <span className="ml-1 text-sm font-medium">Filtre</span>
-          {activeFilterCount > 0 ? (
-            <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 inline-flex min-h-5 min-w-5 items-center justify-center rounded-full px-1 text-[10px] font-semibold">
-              {activeFilterCount}
-            </span>
-          ) : null}
-        </Button>
       </div>
 
       {activeFilterCount > 0 ? (
@@ -209,7 +139,7 @@ export function WantedFilters() {
       ) : null}
 
       <div
-        className="flex gap-2 overflow-x-auto pb-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        className="-mx-[14px] flex gap-[8.75px] overflow-x-auto overflow-y-hidden pl-[14px] pr-[14px] pb-[2px] whitespace-nowrap touch-pan-x snap-x snap-mandatory scroll-pl-[14px] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         role="group"
         aria-label="Rýchle kategórie a filtre"
       >
@@ -217,23 +147,25 @@ export function WantedFilters() {
           const Icon = quickCategory.icon;
           const isSelected = currentQuery.toLowerCase() === quickCategory.searchQuery.toLowerCase();
           return (
-            <FilterChip
-              key={quickCategory.id}
-              selected={isSelected}
+          <FilterChip
+            key={quickCategory.id}
+            selected={isSelected}
               onClick={() =>
                 updateParams({
                   q: isSelected ? "" : quickCategory.searchQuery,
                 })
               }
-              className="min-h-[40px] shrink-0"
-            >
-              <span className="inline-flex items-center gap-1.5">
-                <Icon className="size-3.5" aria-hidden />
-                {quickCategory.label}
+            className="h-[54px] min-h-0 shrink-0 snap-start rounded-[18px] bg-[#faf8f4] px-[8px] py-[8px] text-[12px] font-medium leading-[21px] shadow-[0_2px_6px_rgba(0,0,0,0.03)]"
+          >
+            <span className="inline-flex items-center gap-[6px]">
+              <span className="flex size-[38px] items-center justify-center rounded-full bg-[#f1ece1] p-[2px]">
+                <Icon className="size-[18px] text-[#67635c]" aria-hidden />
               </span>
-            </FilterChip>
-          );
-        })}
+              {quickCategory.label}
+            </span>
+          </FilterChip>
+        );
+      })}
 
         {INTENT_CHIPS.map((intentOption) => (
           <FilterChip
@@ -244,13 +176,16 @@ export function WantedFilters() {
                 intent: currentIntent === intentOption.value ? "" : intentOption.value,
               })
             }
-            className="min-h-[40px] shrink-0"
+            className="h-[54px] min-h-0 shrink-0 snap-start rounded-[18px] bg-[#faf8f4] px-[14px] text-[12px] font-medium leading-[21px] shadow-[0_2px_6px_rgba(0,0,0,0.03)]"
           >
             {intentOption.label}
           </FilterChip>
         ))}
 
-        <FilterChip onClick={openFilters} className="min-h-[40px] shrink-0">
+        <FilterChip
+          onClick={openFilters}
+          className="h-[54px] min-h-0 shrink-0 snap-start rounded-[18px] bg-[#faf8f4] px-[14px] text-[12px] font-medium leading-[21px] shadow-[0_2px_6px_rgba(0,0,0,0.03)]"
+        >
           Úmysel
         </FilterChip>
       </div>

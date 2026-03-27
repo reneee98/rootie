@@ -35,8 +35,8 @@ export function StepPricing({ draft, updateDraft, errors }: StepProps) {
               value={draft.fixedPrice}
               onChange={(e) => updateDraft({ fixedPrice: e.target.value })}
               placeholder="0"
-              className={`h-14 w-full rounded-lg border bg-background pl-10 pr-4 text-xl font-semibold outline-none focus:border-ring focus:ring-ring/50 focus:ring-[3px] ${
-                errors.fixedPrice ? "border-destructive" : "border-input"
+              className={`rootie-field h-14 pl-10 pr-4 text-xl font-semibold ${
+                errors.fixedPrice ? "border-destructive" : ""
               }`}
               aria-invalid={!!errors.fixedPrice}
             />
@@ -77,8 +77,8 @@ export function StepPricing({ draft, updateDraft, errors }: StepProps) {
               updateDraft({ auctionStartPrice: e.target.value })
             }
             placeholder="0"
-            className={`h-14 w-full rounded-lg border bg-background pl-10 pr-4 text-xl font-semibold outline-none focus:border-ring focus:ring-ring/50 focus:ring-[3px] ${
-              errors.auctionStartPrice ? "border-destructive" : "border-input"
+            className={`rootie-field h-14 pl-10 pr-4 text-xl font-semibold ${
+              errors.auctionStartPrice ? "border-destructive" : ""
             }`}
             aria-invalid={!!errors.auctionStartPrice}
           />
@@ -108,10 +108,10 @@ export function StepPricing({ draft, updateDraft, errors }: StepProps) {
               updateDraft({ auctionMinIncrement: e.target.value })
             }
             placeholder="1"
-            className={`h-12 w-full rounded-lg border bg-background pl-10 pr-4 text-base outline-none focus:border-ring focus:ring-ring/50 focus:ring-[3px] ${
+            className={`rootie-field h-12 pl-10 pr-4 text-base ${
               errors.auctionMinIncrement
                 ? "border-destructive"
-                : "border-input"
+                : ""
             }`}
             aria-invalid={!!errors.auctionMinIncrement}
           />

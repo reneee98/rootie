@@ -51,22 +51,22 @@ export default async function WantedDetailPage({
     .join("") || "?";
 
   return (
-    <div className="space-y-4 pb-32">
-      <div className="space-y-2">
+    <div className="rootie-page pb-32">
+      <div className="rootie-page-header space-y-2">
         <Badge variant="secondary" className="gap-0.5">
           <ArrowLeftRight className="size-3" aria-hidden />
           {INTENT_LABELS[wanted.intent] ?? wanted.intent}
         </Badge>
-        <h1 className="text-xl font-bold leading-tight">
+        <h1 className="text-xl font-bold leading-tight text-[#232711]">
           {wanted.plant_name}
         </h1>
-        <p className="text-muted-foreground text-sm flex items-center gap-1.5">
+        <p className="text-[#67635c] text-sm flex items-center gap-1.5">
           <Euro className="size-4" aria-hidden />
           {budgetLabel}
         </p>
       </div>
 
-      <div className="space-y-3 rounded-lg border p-4">
+      <div className="rootie-surface space-y-3 p-4">
         <h2 className="text-sm font-semibold">Detaily</h2>
         <dl className="grid gap-2 text-sm">
           <div className="flex items-center gap-2 text-muted-foreground">
@@ -84,7 +84,7 @@ export default async function WantedDetailPage({
       </div>
 
       {wanted.notes?.trim() && (
-        <div className="space-y-2 rounded-lg border p-4">
+        <div className="rootie-surface space-y-2 p-4">
           <h2 className="text-sm font-semibold">Poznámky</h2>
           <p className="text-muted-foreground whitespace-pre-wrap text-sm">
             {wanted.notes.trim()}
@@ -96,7 +96,7 @@ export default async function WantedDetailPage({
         <h2 className="text-sm font-semibold">Používateľ</h2>
         <Link
           href={`/profile/${wanted.user.id}`}
-          className="focus-visible:ring-ring flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-accent outline-none focus-visible:ring-2"
+          className="rootie-surface focus-visible:ring-ring flex items-center gap-3 p-3 transition-colors hover:bg-accent outline-none focus-visible:ring-2"
           aria-label={`Profil používateľa ${displayName}`}
         >
           <Avatar size="lg">

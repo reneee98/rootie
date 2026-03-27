@@ -29,7 +29,7 @@ export function SubmitReviewForm({
   );
 
   return (
-    <form action={formAction} className="flex flex-col gap-4">
+    <form action={formAction} className="rootie-surface flex flex-col gap-4 p-4">
       <div>
         <label htmlFor="review-rating" className="mb-1 block text-sm font-medium">
           Hodnotenie (1–5)
@@ -38,7 +38,7 @@ export function SubmitReviewForm({
           id="review-rating"
           name="rating"
           required
-          className="border-input bg-background focus-visible:ring-ring flex h-11 w-full rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2"
+          className="rootie-field"
           aria-required
         >
           <option value="">Vyberte</option>
@@ -58,7 +58,7 @@ export function SubmitReviewForm({
           name="body"
           rows={4}
           placeholder="Ako prebehla transakcia?"
-          className="border-input bg-background focus-visible:ring-ring w-full resize-y rounded-md border px-3 py-2 text-sm outline-none focus-visible:ring-2"
+          className="rootie-textarea"
         />
       </div>
       {state?.ok === false && (

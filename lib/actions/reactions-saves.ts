@@ -60,7 +60,9 @@ export async function saveReaction(
   return { ok: true };
 }
 
-export type ToggleSaveResult = { ok: true; is_saved: boolean } | { ok: false; error: string };
+export type ToggleSaveResult =
+  | { ok: true; is_saved: boolean; save_count: number }
+  | { ok: false; error: string };
 
 /**
  * Toggle save (heart) for the current user on a listing.
@@ -87,10 +89,14 @@ export async function toggleSave(listingId: string): Promise<ToggleSaveResult> {
       .eq("user_id", user.id)
       .eq("listing_id", listingId);
     if (error) return { ok: false, error: error.message };
+    const { count } = await supabase
+      .from("saved_listings")
+      .select("listing_id", { count: "exact", head: true })
+      .eq("listing_id", listingId);
     revalidatePath(`/listing/${listingId}`);
     revalidatePath("/saved");
     revalidatePath("/");
-    return { ok: true, is_saved: false };
+    return { ok: true, is_saved: false, save_count: count ?? 0 };
   }
 
   const { error } = await supabase.from("saved_listings").insert({
@@ -98,8 +104,12 @@ export async function toggleSave(listingId: string): Promise<ToggleSaveResult> {
     listing_id: listingId,
   });
   if (error) return { ok: false, error: error.message };
+  const { count } = await supabase
+    .from("saved_listings")
+    .select("listing_id", { count: "exact", head: true })
+    .eq("listing_id", listingId);
   revalidatePath(`/listing/${listingId}`);
   revalidatePath("/saved");
   revalidatePath("/");
-  return { ok: true, is_saved: true };
+  return { ok: true, is_saved: true, save_count: count ?? 0 };
 }

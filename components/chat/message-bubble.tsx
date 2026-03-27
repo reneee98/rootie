@@ -306,7 +306,7 @@ export function MessageBubble({
                     value={counterAmount}
                     onChange={(e) => setCounterAmount(e.target.value)}
                     placeholder="Suma (€)"
-                    className="border-input bg-background h-11 w-32 rounded-md border px-2 text-sm text-foreground"
+                    className="rootie-field h-11 w-32 px-2 text-foreground"
                     disabled={pending}
                   />
                   <Button
@@ -424,7 +424,7 @@ export function MessageBubble({
                     onChange={(e) => setSwapCounterText(e.target.value)}
                     placeholder="Napíšte návrh inej výmeny…"
                     rows={2}
-                    className="border-input bg-background w-full resize-none rounded-md border px-2 py-1.5 text-sm text-foreground"
+                    className="rootie-textarea w-full resize-none px-2 py-1.5 text-foreground"
                     disabled={pending}
                   />
                   <Button

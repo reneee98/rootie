@@ -23,7 +23,7 @@ function ListingCardCell({ listing }: { listing: ListingCard }) {
     <Link
       href={`/listing/${listing.id}`}
       className={cn(
-        "focus-visible:ring-ring flex flex-col overflow-hidden rounded-lg border bg-card shadow-sm",
+        "rootie-surface focus-visible:ring-ring flex flex-col overflow-hidden",
         "min-h-[120px] outline-none focus-visible:ring-2 focus-visible:ring-offset-2"
       )}
       aria-label={`${listing.plant_name}, ${priceLabel}`}

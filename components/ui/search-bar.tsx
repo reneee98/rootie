@@ -27,7 +27,7 @@ const SearchBar = React.forwardRef<HTMLInputElement, SearchBarProps>(
     return (
       <div
         className={cn(
-          "flex min-h-[44px] w-full items-center gap-2 rounded-lg border border-input bg-background px-3 shadow-xs focus-within:border-ring focus-within:ring-ring/50 focus-within:ring-[3px]",
+          "rootie-surface flex min-h-[44px] w-full items-center gap-2 rounded-[18px] px-3 focus-within:border-ring focus-within:ring-2 focus-within:ring-ring/30",
           containerClassName
         )}
       >

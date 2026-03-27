@@ -125,7 +125,7 @@ export function MojeSections({
                   <li key={purchase.id}>
                     <Link
                       href={`/chat/${purchase.thread_id}`}
-                      className="focus-visible:ring-ring flex items-center gap-3 rounded-lg border bg-card p-3 outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2"
+                      className="rootie-surface focus-visible:ring-ring flex items-center gap-3 p-3 outline-none transition-colors hover:bg-accent/50 focus-visible:ring-2"
                     >
                       <div className="relative size-14 shrink-0 overflow-hidden rounded-md bg-muted">
                         {purchase.listing_photo_url ? (

@@ -14,6 +14,14 @@ pnpm dev
 bun dev
 ```
 
+If your terminal does not find `npm`, use the local helper (works with bundled Node too):
+
+```bash
+./scripts/dev-local.sh
+```
+
+It also clears stale Next.js lock/process issues on port `3000`.
+
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.

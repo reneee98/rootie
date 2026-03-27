@@ -57,7 +57,7 @@ export function ListingDetailsAccordion({
 
   return (
     <details
-      className="group rounded-xl border bg-card"
+      className="rootie-surface group"
       open
     >
       <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between px-4 py-3 font-semibold outline-none [&::-webkit-details-marker]:hidden">
