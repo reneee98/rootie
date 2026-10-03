@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { getUser } from "@/lib/auth";
+import { isUuidLike } from "@/lib/validators";
+import { isMessageTimestamp, messageCursorFilter } from "@/lib/message-cursor";
 
 export async function GET(request: NextRequest) {
   const user = await getUser();
@@ -14,11 +16,20 @@ export async function GET(request: NextRequest) {
   const threadId = searchParams.get("threadId");
   const before = searchParams.get("before");
   const after = searchParams.get("after");
+  const beforeId = searchParams.get("beforeId");
+  const afterId = searchParams.get("afterId");
 
-  if (!threadId) {
-    return new Response(JSON.stringify({ error: "Missing threadId" }), {
+  if (!threadId || !isUuidLike(threadId)) {
+    return new Response(JSON.stringify({ error: "Invalid threadId" }), {
       status: 400,
     });
+  }
+
+  if ((before && !isMessageTimestamp(before)) || (after && !isMessageTimestamp(after))) {
+    return Response.json({ error: "Invalid message timestamp" }, { status: 400 });
+  }
+  if ((beforeId && (!before || !isUuidLike(beforeId))) || (afterId && (!after || !isUuidLike(afterId)))) {
+    return Response.json({ error: "Invalid message cursor" }, { status: 400 });
   }
 
   if (before && after) {
@@ -31,15 +42,18 @@ export async function GET(request: NextRequest) {
 
   const { data: thread } = await supabase
     .from("threads")
-    .select("id")
+    .select("id, user1_id, user2_id")
     .eq("id", threadId)
-    .or(`user1_id.eq.${user.id},user2_id.eq.${user.id}`)
     .single();
 
   if (!thread) {
     return new Response(JSON.stringify({ error: "Forbidden" }), {
       status: 403,
     });
+  }
+  if (thread.user1_id !== user.id && thread.user2_id !== user.id) {
+    const { data: profile } = await supabase.from("profiles").select("is_moderator").eq("id", user.id).maybeSingle();
+    if (!profile?.is_moderator) return Response.json({ error: "Forbidden" }, { status: 403 });
   }
 
   const mapMessage = (m: {
@@ -69,17 +83,19 @@ export async function GET(request: NextRequest) {
     .eq("thread_id", threadId);
 
   if (after) {
+    q = afterId ? q.or(messageCursorFilter("after", after, afterId)) : q.gte("created_at", after);
     q = q
-      .gte("created_at", after)
       .order("created_at", { ascending: true })
-      .limit(limit);
+      .order("id", { ascending: true })
+      .limit(limit + 1);
   } else {
     q = q
       .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
       .limit(limit + 1);
 
     if (before) {
-      q = q.lt("created_at", before);
+      q = beforeId ? q.or(messageCursorFilter("before", before, beforeId)) : q.lt("created_at", before);
     }
   }
 
@@ -92,8 +108,8 @@ export async function GET(request: NextRequest) {
   }
 
   if (after) {
-    const messages = (rows ?? []).map(mapMessage);
-    return Response.json({ messages, hasMore: false });
+    const messages = (rows ?? []).slice(0, limit).map(mapMessage);
+    return Response.json({ messages, hasMore: (rows?.length ?? 0) > limit });
   }
 
   const list = rows ?? [];

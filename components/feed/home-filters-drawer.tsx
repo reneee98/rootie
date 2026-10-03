@@ -136,6 +136,7 @@ export function HomeFiltersDrawer({
   const apply = useCallback(() => {
     const params = new URLSearchParams(searchParams.toString());
     params.delete("page");
+    if (draftRegion !== currentRegion) params.delete("district");
 
     if (draftType === "all") params.delete("type");
     else params.set("type", draftType);
@@ -166,6 +167,7 @@ export function HomeFiltersDrawer({
     draftSwap,
     draftType,
     draftVerified,
+    currentRegion,
     router,
     searchParams,
   ]);
@@ -179,7 +181,7 @@ export function HomeFiltersDrawer({
     setDraftVerified(false);
 
     const params = new URLSearchParams(searchParams.toString());
-    ["type", "sort", "region", "category", "swap", "verified", "page"].forEach((k) =>
+    ["type", "sort", "region", "category", "swap", "verified", "page", "district", "priceMin", "priceMax", "auctionEnds", "auctionMinBid", "minPhotos", "condition", "size"].forEach((k) =>
       params.delete(k)
     );
     const qs = params.toString();
@@ -233,6 +235,7 @@ export function HomeFiltersDrawer({
               <div className="relative">
                 <select
                   value={draftSort}
+                  aria-label="Triedenie"
                   onChange={(event) => setDraftSort(event.target.value as FeedSort)}
                   className="h-11 min-h-[44px] w-full appearance-none rounded-xl border border-[#ded7c6] bg-[#f8f4ec] px-3 pr-12 text-sm text-[#232711] outline-none focus-visible:ring-2 focus-visible:ring-[#4f5826]/35"
                 >
@@ -262,6 +265,7 @@ export function HomeFiltersDrawer({
               <div className="relative">
                 <select
                   value={draftRegion}
+                  aria-label="Kraj"
                   onChange={(event) => setDraftRegion(event.target.value)}
                   className="h-11 min-h-[44px] w-full appearance-none rounded-xl border border-[#ded7c6] bg-[#f8f4ec] px-3 pr-12 text-sm text-[#232711] outline-none focus-visible:ring-2 focus-visible:ring-[#4f5826]/35"
                 >

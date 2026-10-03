@@ -8,7 +8,7 @@ type LayoutShellProps = {
   isAuthenticated?: boolean;
 };
 
-const AUTH_PATHS = ["/login", "/signup"];
+const AUTH_PATHS = ["/login", "/signup", "/auth/callback"];
 
 function isAuthRoute(pathname: string) {
   return AUTH_PATHS.some((p) => pathname === p);

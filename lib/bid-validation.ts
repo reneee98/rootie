@@ -2,6 +2,7 @@
  * Pure bid validation for auction listings.
  * Used by place-bid action and unit tests.
  */
+import { isValidEuroAmount } from "@/lib/money-validation";
 
 export type BidValidationInput = {
   startPrice: number;
@@ -25,7 +26,7 @@ export function computeMinBid(
   topBidAmount: number | null
 ): number {
   if (topBidAmount != null) {
-    return topBidAmount + minIncrement;
+    return Math.round((topBidAmount + minIncrement) * 100) / 100;
   }
   return startPrice;
 }
@@ -36,6 +37,15 @@ export function computeMinBid(
 export function validateBid(input: BidValidationInput): BidValidationResult {
   const { startPrice, minIncrement, topBidAmount, amount, auctionEndsAt, now = new Date() } = input;
   const minBid = computeMinBid(startPrice, minIncrement, topBidAmount);
+
+  if (!isValidEuroAmount(amount)) {
+    return { valid: false, error: "Zadajte platnú sumu s najviac dvoma desatinnými miestami.", minBid };
+  }
+  if (!isValidEuroAmount(startPrice) || !isValidEuroAmount(minIncrement) ||
+      (topBidAmount != null && !isValidEuroAmount(topBidAmount)) ||
+      (auctionEndsAt != null && !Number.isFinite(auctionEndsAt.getTime()))) {
+    return { valid: false, error: "Aukcia nemá platné nastavenia.", minBid };
+  }
 
   if (auctionEndsAt && auctionEndsAt <= now) {
     return { valid: false, error: "Aukcia už skončila.", minBid };

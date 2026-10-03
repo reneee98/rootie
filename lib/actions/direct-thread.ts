@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { getUser } from "@/lib/auth";
+import { findOrCreateThread } from "@/lib/thread-create";
 
 /**
  * Get or create a direct thread between the current user and targetUserId.
@@ -28,35 +29,12 @@ export async function getOrCreateDirectThread(targetUserId: string) {
 
   const supabase = await createSupabaseServerClient();
 
-  const { data: existing } = await supabase
-    .from("threads")
-    .select("id")
-    .eq("context_type", "direct")
-    .eq("user1_id", user1Id)
-    .eq("user2_id", user2Id)
-    .maybeSingle();
-
-  if (existing) {
-    redirect(`/chat/${existing.id}`);
-  }
-
-  const { data: inserted, error } = await supabase
-    .from("threads")
-    .insert({
-      context_type: "direct",
-      listing_id: null,
-      wanted_request_id: null,
-      user1_id: user1Id,
-      user2_id: user2Id,
-    })
-    .select("id")
-    .single();
-
-  if (error || !inserted) {
-    redirect(`/profile/${targetUserId}?error=thread`);
-  }
-
-  redirect(`/chat/${inserted.id}`);
+  const threadId = await findOrCreateThread(supabase, {
+    context_type: "direct", listing_id: null, wanted_request_id: null,
+    user1_id: user1Id, user2_id: user2Id,
+  });
+  if (!threadId) redirect(`/profile/${targetUserId}?error=thread`);
+  redirect(`/chat/${threadId}`);
 }
 
 /**

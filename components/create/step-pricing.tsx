@@ -12,10 +12,10 @@ const DURATION_PRESETS = [
 export function StepPricing({ draft, updateDraft, errors }: StepProps) {
   if (draft.type === "fixed") {
     return (
-      <div className="space-y-6">
+      <div className="space-y-5">
         <div>
-          <h2 className="text-base font-semibold mb-1">Cena</h2>
-          <p className="text-sm text-muted-foreground">
+          <h2 className="mb-1 text-base font-semibold text-[#232711]">Cena</h2>
+          <p className="text-sm text-[#67635c]">
             Zadajte cenu, za ktorú chcete rastlinu predať.
           </p>
         </div>
@@ -30,12 +30,12 @@ export function StepPricing({ draft, updateDraft, errors }: StepProps) {
               id="fixedPrice"
               type="number"
               inputMode="decimal"
-              min="0"
-              step="0.5"
+              min="0.01"
+              step="0.01"
               value={draft.fixedPrice}
               onChange={(e) => updateDraft({ fixedPrice: e.target.value })}
               placeholder="0"
-              className={`rootie-field h-14 pl-10 pr-4 text-xl font-semibold ${
+              className={`rootie-field h-14 border-[#e9e2d1] bg-[#faf8f4] pl-10 pr-4 text-xl font-semibold ${
                 errors.fixedPrice ? "border-destructive" : ""
               }`}
               aria-invalid={!!errors.fixedPrice}
@@ -51,10 +51,10 @@ export function StepPricing({ draft, updateDraft, errors }: StepProps) {
 
   /* Auction pricing */
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h2 className="text-base font-semibold mb-1">Nastavenie aukcie</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="mb-1 text-base font-semibold text-[#232711]">Nastavenie aukcie</h2>
+        <p className="text-sm text-[#67635c]">
           Zadajte začiatočnú cenu a parametre aukcie.
         </p>
       </div>
@@ -70,14 +70,14 @@ export function StepPricing({ draft, updateDraft, errors }: StepProps) {
             id="auctionStartPrice"
             type="number"
             inputMode="decimal"
-            min="0"
-            step="0.5"
+            min="0.01"
+            step="0.01"
             value={draft.auctionStartPrice}
             onChange={(e) =>
               updateDraft({ auctionStartPrice: e.target.value })
             }
             placeholder="0"
-            className={`rootie-field h-14 pl-10 pr-4 text-xl font-semibold ${
+            className={`rootie-field h-14 border-[#e9e2d1] bg-[#faf8f4] pl-10 pr-4 text-xl font-semibold ${
               errors.auctionStartPrice ? "border-destructive" : ""
             }`}
             aria-invalid={!!errors.auctionStartPrice}
@@ -101,18 +101,14 @@ export function StepPricing({ draft, updateDraft, errors }: StepProps) {
             id="auctionMinIncrement"
             type="number"
             inputMode="decimal"
-            min="0"
-            step="0.5"
+            min="0.01"
+            step="0.01"
             value={draft.auctionMinIncrement}
             onChange={(e) =>
               updateDraft({ auctionMinIncrement: e.target.value })
             }
             placeholder="1"
-            className={`rootie-field h-12 pl-10 pr-4 text-base ${
-              errors.auctionMinIncrement
-                ? "border-destructive"
-                : ""
-            }`}
+            className={`rootie-field h-12 border-[#e9e2d1] bg-[#faf8f4] pl-10 pr-4 text-base ${errors.auctionMinIncrement ? "border-destructive" : ""}`}
             aria-invalid={!!errors.auctionMinIncrement}
           />
         </div>
@@ -134,10 +130,10 @@ export function StepPricing({ draft, updateDraft, errors }: StepProps) {
               key={preset.value}
               type="button"
               onClick={() => updateDraft({ auctionDuration: preset.value })}
-              className={`h-12 rounded-lg border-2 text-sm font-medium transition-colors ${
+              className={`h-12 rounded-[14px] border text-sm font-semibold transition-colors ${
                 draft.auctionDuration === preset.value
-                  ? "border-primary bg-primary/5 text-primary"
-                  : "border-muted hover:border-muted-foreground/30"
+                  ? "border-[#4f5826] bg-[#eef4e5] text-[#4f5826]"
+                  : "border-[#e9e2d1] bg-[#faf8f4] text-[#67635c] hover:border-[#d9cfb7]"
               }`}
               aria-pressed={draft.auctionDuration === preset.value}
             >

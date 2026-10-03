@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useCallback, useTransition } from "react";
+import { useState, useEffect, useCallback, useTransition, useRef } from "react";
 import { Euro, Gavel, Clock, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { placeBid } from "@/lib/actions/place-bid";
 import { formatPrice } from "@/lib/formatters";
+import { parseEuroAmountStrict } from "@/lib/money-validation";
 import { Button } from "@/components/ui/button";
 
 /* ------------------------------------------------------------------ */
@@ -31,7 +32,7 @@ type AuctionBidPanelProps = {
 function formatCountdown(endsAt: Date): { text: string; ended: boolean } {
   const diff = endsAt.getTime() - Date.now();
 
-  if (diff <= 0) return { text: "Aukcia skončila", ended: true };
+  if (!Number.isFinite(diff) || diff <= 0) return { text: "Aukcia skončila", ended: true };
 
   const days = Math.floor(diff / 86_400_000);
   const hours = Math.floor((diff % 86_400_000) / 3_600_000);
@@ -67,6 +68,7 @@ export function AuctionBidPanel({
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const [isPending, startTransition] = useTransition();
+  const seenBidIds = useRef(new Set<string>());
 
   /* Timer state */
   const [countdown, setCountdown] = useState(() =>
@@ -76,7 +78,7 @@ export function AuctionBidPanel({
   /* Derived */
   const currentPrice = currentBid ?? auctionStartPrice;
   const minBid =
-    currentBid != null ? currentPrice + auctionMinIncrement : auctionStartPrice;
+    currentBid != null ? Math.round((currentPrice + auctionMinIncrement) * 100) / 100 : auctionStartPrice;
   const isEnded = countdown.ended;
 
   /* ---- Countdown timer ---- */
@@ -103,6 +105,9 @@ export function AuctionBidPanel({
           filter: `listing_id=eq.${listingId}`,
         },
         (payload) => {
+          const bidId = String(payload.new.id);
+          if (seenBidIds.current.has(bidId)) return;
+          seenBidIds.current.add(bidId);
           const newAmount = Number(payload.new.amount);
           setCurrentBid((prev) =>
             prev === null || newAmount > prev ? newAmount : prev
@@ -129,9 +134,10 @@ export function AuctionBidPanel({
 
   /* ---- Submit handler ---- */
   const handleSubmit = useCallback(() => {
-    const amount = parseFloat(bidAmount);
+    if (isPending || isEnded || !isAuthenticated || isOwnListing) return;
+    const amount = parseEuroAmountStrict(bidAmount);
 
-    if (isNaN(amount) || amount <= 0) {
+    if (amount == null || amount <= 0) {
       setError("Zadajte platnú sumu.");
       return;
     }
@@ -145,15 +151,24 @@ export function AuctionBidPanel({
     setSuccess("");
 
     startTransition(async () => {
-      const result = await placeBid(listingId, amount);
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        const result = await placeBid(listingId, amount);
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        setSuccess(`Ponuka ${formatPrice(result.amount)} bola prijatá!`);
+        setCurrentBid((current) => Math.max(current ?? 0, result.amount));
+        if (!seenBidIds.current.has(result.bidId)) {
+          seenBidIds.current.add(result.bidId);
+          setBidCount((count) => count + 1);
+        }
+        setBidAmount((Math.round((result.amount + auctionMinIncrement) * 100) / 100).toString());
+      } catch {
+        setError("Príhoz sa nepodarilo pridať. Skúste to znova.");
       }
-      setSuccess(`Ponuka ${formatPrice(result.amount)} bola prijatá!`);
-      setBidAmount("");
     });
-  }, [bidAmount, listingId, minBid, startTransition]);
+  }, [bidAmount, listingId, minBid, auctionMinIncrement, isPending, isEnded, isAuthenticated, isOwnListing, startTransition]);
 
   /* ---- Render ---- */
   return (
@@ -200,7 +215,7 @@ export function AuctionBidPanel({
                 type="number"
                 inputMode="decimal"
                 min={minBid}
-                step="0.5"
+                step="0.01"
                 value={bidAmount}
                 onChange={(e) => {
                   setBidAmount(e.target.value);
@@ -248,7 +263,7 @@ export function AuctionBidPanel({
             </p>
           )}
 
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           {success && (
             <p className="text-sm text-emerald-600">{success}</p>
           )}

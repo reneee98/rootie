@@ -12,7 +12,7 @@ export default defineConfig({
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
-  webServer: process.env.CI
+  webServer: process.env.CI || process.env.PLAYWRIGHT_BASE_URL
     ? undefined
     : {
         command: "npm run dev",

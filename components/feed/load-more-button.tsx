@@ -5,31 +5,40 @@ import { useTransition } from "react";
 
 import { Button } from "@/components/ui/button";
 
-export function LoadMoreButton() {
+export function LoadMoreButton({ hasMore = true }: { hasMore?: boolean }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [isPending, startTransition] = useTransition();
 
-  const currentPage = Number(searchParams.get("page") || "1");
+  const rawPage = Number(searchParams.get("page") || "1");
+  const currentPage = Number.isSafeInteger(rawPage) && rawPage > 0 ? rawPage : 1;
 
-  const handleLoadMore = () => {
+  const navigateToPage = (page: number) => {
     const params = new URLSearchParams(searchParams.toString());
-    params.set("page", String(currentPage + 1));
+    if (page === 1) params.delete("page");
+    else params.set("page", String(page));
     startTransition(() => {
-      router.push(`/?${params.toString()}`, { scroll: false });
+      router.push(params.size > 0 ? `/?${params.toString()}` : "/");
     });
   };
 
   return (
-    <div className="flex justify-center py-4">
+    <div className="flex justify-center gap-2 py-4">
+      {currentPage > 1 ? (
+        <Button variant="outline" disabled={isPending} className="flex-1" onClick={() => navigateToPage(currentPage - 1)}>
+          Predchádzajúce
+        </Button>
+      ) : null}
+      {hasMore ? (
       <Button
         variant="outline"
-        onClick={handleLoadMore}
+        onClick={() => navigateToPage(currentPage + 1)}
         disabled={isPending}
-        className="w-full"
+        className="flex-1"
       >
-        {isPending ? "Načítavam…" : "Načítať ďalšie"}
+        {isPending ? "Načítavam…" : "Ďalšie inzeráty"}
       </Button>
+      ) : null}
     </div>
   );
 }

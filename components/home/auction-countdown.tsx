@@ -6,6 +6,7 @@ function formatCountdown(endsAt: string | null) {
   if (!endsAt) return "Končí čoskoro";
 
   const diff = new Date(endsAt).getTime() - Date.now();
+  if (!Number.isFinite(diff)) return "Koniec aukcie nie je známy";
   if (diff <= 0) return "Skončené";
 
   const days = Math.floor(diff / 86_400_000);
@@ -18,14 +19,16 @@ function formatCountdown(endsAt: string | null) {
 }
 
 export function AuctionCountdown({ endsAt }: { endsAt: string | null }) {
-  const [, setTick] = useState(0);
+  const [label, setLabel] = useState("Načítavam čas…");
 
   useEffect(() => {
+    const update = () => setLabel(formatCountdown(endsAt));
+    update();
     const timer = setInterval(() => {
-      setTick((value) => value + 1);
+      update();
     }, 1000);
     return () => clearInterval(timer);
-  }, []);
+  }, [endsAt]);
 
-  return <>{formatCountdown(endsAt)}</>;
+  return <>{label}</>;
 }

@@ -4,7 +4,6 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/formatters";
 import type { WantedFeedCard as WantedFeedCardType } from "@/lib/data/wanted";
-import { cn } from "@/lib/utils";
 
 const INTENT_LABELS: Record<string, string> = {
   buy: "Kúpiť",
@@ -33,66 +32,80 @@ export function WantedFeedCard({ item }: WantedFeedCardProps) {
           ? `Do ${formatPrice(item.budget_max)}`
           : "Dohodou";
   const locationLabel = item.district ? `${item.district}, ${item.region}` : item.region;
+  const firstName = displayName.split(/\s+/)[0] || "Používateľ";
+  const intentLabel = INTENT_LABELS[item.intent] ?? item.intent;
 
   return (
-    <Link
-      href={`/wanted/${item.id}`}
-      className={cn(
-        "rootie-surface focus-visible:ring-ring flex flex-col overflow-hidden",
-        "outline-none transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2"
-      )}
-      aria-label={`${item.plant_name}, ${INTENT_LABELS[item.intent] ?? item.intent}`}
-    >
-      <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-muted to-secondary/20" />
+    <article className="relative overflow-hidden rounded-[14px] bg-[#faf8f4] shadow-[0_2px_6px_rgba(0,0,0,0.03)]">
+      <Link
+        href={`/wanted/${item.id}`}
+        className="absolute inset-0 z-10"
+        aria-label={`${item.plant_name}, ${intentLabel}`}
+      />
+
+      <div className="relative h-[167.75px] overflow-hidden p-[10px]">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#f0ebdc] via-[#f6f2e8] to-[#ebe4d4]" />
+        <div className="absolute inset-x-0 bottom-0 h-[56%] bg-gradient-to-t from-[#e3dccd] to-transparent" />
+
         <div className="absolute inset-0 flex items-center justify-center">
-          <div className="rounded-full border border-primary/20 bg-background/80 p-4 shadow-sm backdrop-blur-sm">
-            <Flower2 className="size-8 text-primary/70" aria-hidden />
+          <div className="rounded-full border border-[#c4c35b]/30 bg-[#faf8f4]/90 p-4 shadow-[0_2px_6px_rgba(0,0,0,0.06)]">
+            <Flower2 className="size-8 text-[#5a6e5a]" aria-hidden />
           </div>
         </div>
-        <div className="absolute top-2 left-2 flex flex-wrap items-center gap-1">
-          <Badge className="rounded-full px-2 py-1 text-[10px] tracking-wide uppercase">
+
+        <div className="relative z-20 flex min-w-0 items-center gap-[6px]">
+          <Badge className="rounded-[8px] bg-[#4f5826] px-[6px] py-[4px] text-[10px] leading-[14px] tracking-normal text-[#c4c35b]">
             HĽADÁM
           </Badge>
           <Badge
             variant="secondary"
-            className="shrink-0 gap-1 rounded-full px-2 py-1 text-[10px] uppercase"
+            className="min-w-0 max-w-[calc(100%-62px)] gap-1 rounded-[8px] bg-[#f1ece1] px-[6px] py-[4px] text-[10px] leading-[14px] tracking-normal text-[#4f5826]"
           >
-            {item.intent === "swap" && (
+            {item.intent !== "buy" ? (
               <ArrowLeftRight className="size-3" aria-hidden />
-            )}
-            {INTENT_LABELS[item.intent] ?? item.intent}
+            ) : null}
+            <span className="truncate">{intentLabel}</span>
           </Badge>
         </div>
       </div>
 
-      <div className="space-y-2 p-3">
-        <p className="truncate text-sm font-semibold leading-snug">
-          {item.plant_name}
-        </p>
-        <p className="text-sm font-semibold">{budgetLabel}</p>
-        <p className="text-muted-foreground text-[11px]">{locationLabel}</p>
-
-        <div className="border-border/70 flex items-center gap-2 border-t pt-2">
-          <Avatar className="size-7 shrink-0">
-            {item.user.avatar_url ? (
-              <AvatarImage src={item.user.avatar_url} alt={displayName} />
-            ) : null}
-            <AvatarFallback className="text-[10px] font-medium">
-              {initials}
-            </AvatarFallback>
-          </Avatar>
-
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[11px] font-medium">{displayName}</p>
-            <p className="text-muted-foreground flex items-center gap-1 text-[10px]">
-              <MapPin className="size-3 shrink-0" aria-hidden />
-              <span className="truncate">{locationLabel}</span>
-            </p>
+      <div className="space-y-1.5 p-[10px] text-[#232711]">
+        <div>
+          <div className="flex h-[14px] items-center gap-[3.5px]">
+            <MapPin className="size-[10.5px] text-[#5a6e5a]" aria-hidden />
+            <span className="truncate text-[10px] leading-[14px] text-[#5a6e5a]">{locationLabel}</span>
           </div>
+          <p className="w-full truncate text-[12px] font-medium leading-[18px]">{item.plant_name}</p>
+        </div>
 
+        <div className="flex items-center justify-between gap-2">
+          <p className="truncate text-[15px] font-semibold leading-[18px]">{budgetLabel}</p>
+          <span className="shrink-0 rounded-[8px] bg-[#f1ece1] px-2 py-1 text-[9px] font-semibold leading-none text-[#4f5826]">
+            {item.intent === "swap" || item.intent === "both" ? (
+              <span className="inline-flex items-center gap-1">
+                <ArrowLeftRight className="size-[10px]" aria-hidden />
+                {item.intent === "both" ? "Oboje" : "Výmena"}
+              </span>
+            ) : (
+              "Kúpa"
+            )}
+          </span>
+        </div>
+
+        <div className="flex items-center justify-between rounded-[8px] bg-[#f6f3ed] px-[7px] py-[5px]">
+          <div className="flex min-w-0 items-center gap-2">
+            <Avatar className="size-[22px] shrink-0 border border-[#e9e2d1]">
+              {item.user.avatar_url ? (
+                <AvatarImage src={item.user.avatar_url} alt={displayName} />
+              ) : null}
+              <AvatarFallback className="bg-[#f1ece1] text-[9px] font-semibold text-[#4f5826]">
+                {initials}
+              </AvatarFallback>
+            </Avatar>
+            <span className="truncate text-[10px] leading-[14px] text-[#5a6e5a]">{firstName}</span>
+          </div>
         </div>
       </div>
-    </Link>
+    </article>
   );
 }

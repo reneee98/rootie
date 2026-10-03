@@ -12,31 +12,39 @@ export function StepPlant({ draft, updateDraft, errors }: StepProps) {
   const [showDropdown, setShowDropdown] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const searchVersionRef = useRef(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const handleSearch = useCallback(async (term: string) => {
-    if (term.trim().length < 2) {
-      setResults([]);
-      setShowDropdown(false);
-      return;
+  const handleSearch = useCallback(async (term: string, version: number) => {
+    try {
+      const data = await searchPlantTaxa(term);
+      if (version !== searchVersionRef.current) return;
+      setResults(data);
+      setShowDropdown(data.length > 0);
+    } catch {
+      if (version === searchVersionRef.current) setResults([]);
+    } finally {
+      if (version === searchVersionRef.current) setIsSearching(false);
     }
-
-    setIsSearching(true);
-    const data = await searchPlantTaxa(term);
-    setResults(data);
-    setShowDropdown(data.length > 0);
-    setIsSearching(false);
   }, []);
 
   const handleInputChange = (value: string) => {
     setQuery(value);
     updateDraft({ plantName: value, plantTaxonId: null });
-
+    const version = ++searchVersionRef.current;
+    setResults([]);
+    setShowDropdown(false);
+    setIsSearching(value.trim().length >= 2);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
-    timeoutRef.current = setTimeout(() => handleSearch(value), 300);
+    if (value.trim().length >= 2) {
+      timeoutRef.current = setTimeout(() => handleSearch(value, version), 300);
+    }
   };
 
   const handleSelectTaxon = (taxon: PlantTaxonResult) => {
+    searchVersionRef.current += 1;
+    if (timeoutRef.current) clearTimeout(timeoutRef.current);
+    setIsSearching(false);
     setQuery(taxon.canonical_name);
     updateDraft({
       plantName: taxon.canonical_name,
@@ -52,6 +60,9 @@ export function StepPlant({ draft, updateDraft, errors }: StepProps) {
         containerRef.current &&
         !containerRef.current.contains(e.target as Node)
       ) {
+        searchVersionRef.current += 1;
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        setIsSearching(false);
         setShowDropdown(false);
       }
     };
@@ -62,22 +73,23 @@ export function StepPlant({ draft, updateDraft, errors }: StepProps) {
   /* Cleanup timeout */
   useEffect(() => {
     return () => {
+      searchVersionRef.current += 1;
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
   }, []);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h2 className="text-base font-semibold mb-1">Názov rastliny</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="mb-1 text-base font-semibold text-[#232711]">Názov rastliny</h2>
+        <p className="text-sm text-[#67635c]">
           Začnite písať a vyberte z návrhov, alebo zadajte vlastný názov.
         </p>
       </div>
 
       <div ref={containerRef} className="relative">
         <div className="relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground pointer-events-none" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-[#878379]" />
           <input
             type="text"
             value={query}
@@ -86,7 +98,7 @@ export function StepPlant({ draft, updateDraft, errors }: StepProps) {
               if (results.length > 0) setShowDropdown(true);
             }}
             placeholder="napr. Monstera deliciosa"
-            className={`rootie-field h-12 pl-10 pr-4 text-base ${
+            className={`rootie-field h-12 border-[#e9e2d1] bg-[#faf8f4] pl-10 pr-4 text-base ${
               errors.plantName ? "border-destructive" : ""
             }`}
             aria-label="Názov rastliny"
@@ -117,14 +129,14 @@ export function StepPlant({ draft, updateDraft, errors }: StepProps) {
                 role="option"
                 aria-selected={draft.plantTaxonId === taxon.id}
                 onClick={() => handleSelectTaxon(taxon)}
-                className="flex items-center gap-3 w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors border-b last:border-b-0"
+                className="flex w-full items-center gap-3 border-b border-[#f0e9d9] px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-[#f3efe6]"
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
                     {taxon.canonical_name}
                   </p>
                   {taxon.synonyms.length > 0 && (
-                    <p className="text-xs text-muted-foreground truncate">
+                    <p className="truncate text-xs text-[#67635c]">
                       {taxon.synonyms.slice(0, 3).join(", ")}
                     </p>
                   )}
@@ -140,10 +152,10 @@ export function StepPlant({ draft, updateDraft, errors }: StepProps) {
 
       {/* Selected indicator */}
       {draft.plantTaxonId && (
-        <p className="text-xs text-primary flex items-center gap-1">
-          <Check className="size-3" />
+        <div className="inline-flex items-center gap-1.5 rounded-full bg-[#eef4e5] px-3 py-1.5 text-xs font-medium text-[#4f5826]">
+          <Check className="size-3.5" />
           Prepojené s databázou rastlín
-        </p>
+        </div>
       )}
 
       {/* Error */}

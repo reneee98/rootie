@@ -39,14 +39,6 @@ export type MyPurchaseBuckets = {
   cancelled: MyPurchaseCard[];
 };
 
-const SELLER_STATUSES: MyListingStatus[] = [
-  "active",
-  "reserved",
-  "sold",
-  "expired",
-  "removed",
-];
-
 const IN_PROGRESS_ORDER_STATUSES: OrderStatus[] = [
   "price_accepted",
   "address_provided",
@@ -58,12 +50,15 @@ export async function getMyListingBuckets(userId: string): Promise<MyListingBuck
 
   const { data: listings, error } = await supabase
     .from("listings")
-    .select("id, plant_name, type, fixed_price, auction_start_price, status")
+    .select("id, plant_name, type, fixed_price, auction_start_price, auction_ends_at, status")
     .eq("seller_id", userId)
-    .in("status", SELLER_STATUSES)
     .order("created_at", { ascending: false });
 
-  if (error || !listings?.length) {
+  if (error) {
+    console.error("getMyListingBuckets:", error);
+    throw new Error("Vaše inzeráty sa nepodarilo načítať.");
+  }
+  if (!listings?.length) {
     return { active: [], reserved: [], sold: [], inactive: [] };
   }
 
@@ -91,7 +86,10 @@ export async function getMyListingBuckets(userId: string): Promise<MyListingBuck
         ? Number(listing.auction_start_price)
         : null,
     first_photo_url: firstPhotoByListing.get(listing.id) ?? null,
-    status: listing.status as MyListingStatus,
+    status: listing.status === "active" && listing.type === "auction" &&
+      listing.auction_ends_at && new Date(listing.auction_ends_at).getTime() <= Date.now()
+      ? "expired"
+      : listing.status as MyListingStatus,
   }));
 
   return {
@@ -115,7 +113,11 @@ export async function getMyPurchaseBuckets(userId: string): Promise<MyPurchaseBu
     .eq("buyer_id", userId)
     .order("updated_at", { ascending: false });
 
-  if (error || !orders?.length) {
+  if (error) {
+    console.error("getMyPurchaseBuckets:", error);
+    throw new Error("Vaše objednávky sa nepodarilo načítať.");
+  }
+  if (!orders?.length) {
     return { in_progress: [], delivered: [], cancelled: [] };
   }
 

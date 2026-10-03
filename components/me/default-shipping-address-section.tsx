@@ -49,6 +49,8 @@ export function DefaultShippingAddressSection({
             name="name"
             defaultValue={initialAddress?.name ?? ""}
             required
+            autoComplete="name"
+            maxLength={120}
           />
         </div>
 
@@ -61,6 +63,8 @@ export function DefaultShippingAddressSection({
             name="street"
             defaultValue={initialAddress?.street ?? ""}
             required
+            autoComplete="street-address"
+            maxLength={200}
           />
         </div>
 
@@ -73,6 +77,8 @@ export function DefaultShippingAddressSection({
             name="city"
             defaultValue={initialAddress?.city ?? ""}
             required
+            autoComplete="address-level2"
+            maxLength={100}
           />
         </div>
 
@@ -85,6 +91,8 @@ export function DefaultShippingAddressSection({
             name="zip"
             defaultValue={initialAddress?.zip ?? ""}
             required
+            autoComplete="postal-code"
+            maxLength={20}
           />
         </div>
 
@@ -97,6 +105,8 @@ export function DefaultShippingAddressSection({
             name="country"
             defaultValue={initialAddress?.country ?? "Slovensko"}
             required
+            autoComplete="country-name"
+            maxLength={80}
           />
         </div>
 
@@ -107,6 +117,9 @@ export function DefaultShippingAddressSection({
           <Input
             id="shipping-phone"
             name="phone"
+            type="tel"
+            autoComplete="tel"
+            maxLength={40}
             defaultValue={initialAddress?.phone ?? ""}
           />
         </div>
@@ -118,7 +131,7 @@ export function DefaultShippingAddressSection({
         </p>
       )}
       {state?.ok === true && (
-        <p className="text-sm text-emerald-600">Adresa uložená.</p>
+        <p className="text-sm text-emerald-600" role="status">Adresa uložená.</p>
       )}
 
       <Button type="submit" size="sm" disabled={isPending}>

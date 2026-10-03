@@ -5,6 +5,8 @@ import { revalidatePath } from "next/cache";
 
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { getUser } from "@/lib/auth";
+import { findOrCreateThread } from "@/lib/thread-create";
+import { isValidEuroAmount } from "@/lib/money-validation";
 
 /**
  * Get or create a listing thread between current user and the listing's seller.
@@ -35,7 +37,7 @@ export async function getOrCreateListingThread(listingId: string) {
   }
 
   if (listing.type === "auction") {
-    if (listing.status !== "sold") {
+    if (!["reserved", "sold"].includes(listing.status)) {
       redirect(`/listing/${listingId}`);
     }
 
@@ -45,6 +47,7 @@ export async function getOrCreateListingThread(listingId: string) {
       .eq("listing_id", listingId)
       .order("amount", { ascending: false })
       .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .limit(1)
       .maybeSingle();
 
@@ -59,36 +62,12 @@ export async function getOrCreateListingThread(listingId: string) {
     currentId < sellerId ? [currentId, sellerId] : [sellerId, currentId];
 
   // Check for existing thread for this listing between these users
-  const { data: existing } = await supabase
-    .from("threads")
-    .select("id")
-    .eq("context_type", "listing")
-    .eq("listing_id", listingId)
-    .eq("user1_id", user1Id)
-    .eq("user2_id", user2Id)
-    .maybeSingle();
-
-  if (existing) {
-    redirect(`/chat/${existing.id}`);
-  }
-
-  const { data: inserted, error } = await supabase
-    .from("threads")
-    .insert({
-      context_type: "listing",
-      listing_id: listingId,
-      wanted_request_id: null,
-      user1_id: user1Id,
-      user2_id: user2Id,
-    })
-    .select("id")
-    .single();
-
-  if (error || !inserted) {
-    redirect(`/listing/${listingId}?error=thread`);
-  }
-
-  redirect(`/chat/${inserted.id}`);
+  const threadId = await findOrCreateThread(supabase, {
+    context_type: "listing", listing_id: listingId, wanted_request_id: null,
+    user1_id: user1Id, user2_id: user2Id,
+  });
+  if (!threadId) redirect(`/listing/${listingId}?error=thread`);
+  redirect(`/chat/${threadId}`);
 }
 
 /**
@@ -152,7 +131,7 @@ export async function createListingThreadWithOffer(
 
   const { data: listing } = await supabase
     .from("listings")
-    .select("id, seller_id, type, status")
+    .select("id, seller_id, type, status, swap_enabled")
     .eq("id", listingId)
     .single();
 
@@ -164,50 +143,27 @@ export async function createListingThreadWithOffer(
   if (listing.status !== "active") {
     return { ok: false, error: "Na tento inzerát už nie je možné poslať ponuku." };
   }
+  if (offerType === "swap" && !listing.swap_enabled) return { ok: false, error: "Predajca pri tomto inzeráte nepovolil výmenu." };
 
   const [user1Id, user2Id] =
     user.id < listing.seller_id
       ? [user.id, listing.seller_id]
       : [listing.seller_id, user.id];
 
+  if (!["price", "swap"].includes(offerType)) return { ok: false, error: "Neplatný typ ponuky." };
   if (offerType === "price") {
     const num = amount ?? NaN;
-    if (isNaN(num) || num <= 0) return { ok: false, error: "Zadajte platnú sumu." };
+    if (!isValidEuroAmount(num)) return { ok: false, error: "Zadajte platnú sumu." };
   } else {
     const text = (swapBody ?? "").trim();
     if (!text) return { ok: false, error: "Popíšte, čo ponúkate na výmenu." };
   }
 
-  const { data: existing } = await supabase
-    .from("threads")
-    .select("id")
-    .eq("context_type", "listing")
-    .eq("listing_id", listingId)
-    .eq("user1_id", user1Id)
-    .eq("user2_id", user2Id)
-    .maybeSingle();
-
-  let threadId: string;
-  if (existing) {
-    threadId = existing.id;
-  } else {
-    const { data: inserted, error: insertErr } = await supabase
-      .from("threads")
-      .insert({
-        context_type: "listing",
-        listing_id: listingId,
-        wanted_request_id: null,
-        user1_id: user1Id,
-        user2_id: user2Id,
-      })
-      .select("id")
-      .single();
-
-    if (insertErr || !inserted) {
-      return { ok: false, error: "Nepodarilo sa vytvoriť konverzáciu." };
-    }
-    threadId = inserted.id;
-  }
+  const threadId = await findOrCreateThread(supabase, {
+    context_type: "listing", listing_id: listingId, wanted_request_id: null,
+    user1_id: user1Id, user2_id: user2Id,
+  });
+  if (!threadId) return { ok: false, error: "Nepodarilo sa vytvoriť konverzáciu." };
 
   const body = offerType === "price"
     ? String(amount!.toFixed(2))

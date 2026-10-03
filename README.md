@@ -20,7 +20,7 @@ If your terminal does not find `npm`, use the local helper (works with bundled N
 ./scripts/dev-local.sh
 ```
 
-It also clears stale Next.js lock/process issues on port `3000`.
+It restarts only this project's Next.js process on port `3000`. If another project uses the port, it stops with an explanation instead of terminating that project.
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
@@ -32,15 +32,11 @@ This project uses [`next/font`](https://nextjs.org/docs/app/building-your-applic
 
 **Napojenie na Supabase Cloud (online):** postup je v [docs/supabase-cloud.md](docs/supabase-cloud.md) — vytvorenie projektu, API kľúče do `.env.local`, aplikovanie migrácií.
 
-Phase 1.0 schema, RLS, and seed live in `db/`. Apply them in order (e.g. in Supabase SQL Editor or via Docker/init scripts):
+The current schema and security rules live in `supabase/migrations/`. Apply all migrations in filename order using [the migration guide](docs/supabase-cloud.md). The older Phase 1.0 files in `db/` are a historical baseline; applying only those files does not create the current order, chat, privacy, and auction rules:
 
-1. **Schema** — `db/schema.sql` (tables, indexes, triggers: deal confirmations, review ratings).
-2. **RLS** — `db/rls.sql` (row-level security and policies, including `thread_deal_confirmations`).
-3. **Seed** — `db/seed.sql` (plant taxa; idempotent).
+`db/schema.sql` and `db/rls.sql` document the initial schema. The optional `db/seed.sql` fills plant taxa and is idempotent.
 
-With **Docker**: run your Postgres (or Supabase) container and execute the three files in order against the database (e.g. `psql` or init script).
-
-Alternatively, use **Supabase Migrations**: put each file in `supabase/migrations/` with a timestamp prefix and run `supabase db push` (or apply via Dashboard).
+The migration `20260210150000_listing_reserved_status.sql` adds an enum value and must commit before `20260210152000_listing_lifecycle_reserved.sql`. Run each migration separately; do not combine all SQL into one transaction.
 
 Env: set `SUPABASE_URL` and `SUPABASE_ANON_KEY` (and `NEXT_PUBLIC_*` for client). Create a profile row when a user signs up (e.g. trigger or app logic). To use the moderation panel at `/admin/reports`, set `profiles.is_moderator = true` for the desired user (e.g. in Supabase Table Editor or SQL).
 
@@ -52,25 +48,30 @@ Keď aukcii uplynie čas (`auction_ends_at`), vyhráva najvyšší prihodzovač.
 - **Auth:** hlavička `Authorization: Bearer <CRON_SECRET>` alebo `x-cron-secret: <CRON_SECRET>`
 - **Env:** `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` (service role obchádza RLS)
 
-Cron endpoint pre každú skončenú aukciu: nastaví listing na `sold` (alebo `expired`, ak nebol žiaden bid), vytvorí alebo nájde thread medzi predajcom a výhercom, nastaví `deal_confirmed_at` a vloží potvrdenia dohody pre oboch. Výherca potom v chate uvidí „Dohoda potvrdená“ a tlačidlo „Objednávka doručená“.
+Cron endpoint pre každú skončenú aukciu atomicky vytvorí alebo nájde konverzáciu s výhercom, uloží dohodnutú cenu a objednávku a nastaví inzerát na `reserved`. Výherca môže zadať adresu, predajca potvrdiť odoslanie a kupujúci doručenie; až doručenie nastaví inzerát na `sold`. Aukcia bez ponúk skončí ako `expired`. Opakované spustenie nevytvorí druhú dohodu. Vyžaduje migráciu `20261002120000_backend_integrity.sql`.
 
 Príklad (cron-job.org, Vercel Cron, alebo systémový cron):  
 `curl -H "Authorization: Bearer $CRON_SECRET" https://tvoja-domena.com/api/cron/finalize-auctions`
 
 ### Overenie telefónu (badge)
 
-- **Kde:** Nastavenia účtu `/me` — sekcia „Telefón a overenie“.
-- **Dátum:** Číslo a preferencia „Zobrazovať telefón na inzerátoch“ sa ukladajú do `profiles.phone` a `profiles.show_phone_on_listing`. Badge „Overené“ sa zobrazuje podľa `profiles.phone_verified` (profil, karta predajcu, hlavička chatu).
+- **Kde:** Nastavenia účtu `/me/settings` — sekcia „Telefón a overenie“.
+- **Údaje:** Číslo a preferencia „Zobrazovať telefón na inzerátoch“ sa ukladajú do `profiles.phone` a `profiles.show_phone_on_listing`. Badge „Overené“ sa odvodzuje z potvrdeného, zhodného čísla v Supabase Auth. Zmena čísla overenie zruší. Súkromné číslo sa nevracia vo verejných dotazoch na profil; zobrazenie na inzeráte vyžaduje výslovný súhlas a overenie.
 - **SMS / OTP:** Ak je zapnuté overenie cez Supabase Auth:
   - Nastavte `NEXT_PUBLIC_PHONE_VERIFICATION_ENABLED=true`.
   - V Supabase Dashboard: **Authentication → Providers → Phone** zapnite a nakonfigurujte SMS poskytovateľa (Twilio, MessageBird, Vonage alebo TextLocal) podľa [Supabase Phone Auth](https://supabase.com/docs/guides/auth/phone-login).
-  - Používateľ v `/me` zadá číslo, stlačí „Odoslať overovací kód“, zadá OTP a po úspešnom overení sa `phone_verified` synchronizuje z Auth do `profiles`.
+  - Používateľ v `/me/settings` zadá číslo, stlačí „Odoslať overovací kód“, zadá OTP a po úspešnom overení sa `phone_verified` synchronizuje z Auth do `profiles`.
 - **Stub (bez SMS):** Pri `NEXT_PUBLIC_PHONE_VERIFICATION_ENABLED=false` sa v UI zobrazí text, že overenie vyžaduje nastavenie SMS poskytovateľa; používateľ môže uložiť číslo a preferenciu, badge a logika sú pripravené na neskoršie zapnutie.
 
 ### Testy
 
-- **Unit testy (Vitest):** `npm run test` — overenie aukčných ponúk (`lib/bid-validation`), pravidlá jednoznačnosti threadov (`lib/thread-keys`), logika eligibility pre recenzie (`lib/review-eligibility-logic`).
-- **E2E smoke (Playwright):** `npm run test:e2e` — jeden priebeh: prihlásenie (predajca) → vytvorenie inzerátu → prihlásenie (kupujúci) → otvorenie inzerátu a štart chatu → odoslanie správy → vytvorenie wanted → prihlásenie (druhý) → poslanie ponuky na wanted. Vyžaduje bežiaci backend a seednutých test userov (`npm run seed:users`). Voliteľné env: `PLAYWRIGHT_BASE_URL`, `E2E_PREDAJCA_EMAIL`, `E2E_PREDAJCA_PASSWORD`, atď.
+- **Unit a databázové testy:** `npm test` — validácia, koncepty, presmerovania, telefóny a chat; PGlite spustí všetky migrácie v izolovanom PostgreSQL a overí oprávnenia, objednávky, recenzie aj ukončenie aukcií. Testy sa nepripájajú na Supabase Cloud.
+- **Verejné E2E:** `PLAYWRIGHT_BASE_URL=http://localhost:3000 npm run test:e2e -- e2e/public.spec.ts` — mobilné stránky, filtre, presmerovania, chybové stavy a ochrana API. Vyžaduje spustenú aplikáciu.
+- **E2E smoke a chat:** `npm run test:e2e` — vytvára inzeráty, požiadavky a správy v nakonfigurovanej databáze. Spúšťajte proti testovaciemu Supabase projektu s aplikovanými migráciami a testovacími účtami (`npm run seed:users`). Voliteľné env: `PLAYWRIGHT_BASE_URL`, `E2E_PREDAJCA_EMAIL`, `E2E_PREDAJCA_PASSWORD`, atď.
+
+Výsledky poslednej kontroly a zostávajúce kroky pre Supabase Cloud sú v [zázname overenia](docs/verification-2026-10-02.md).
+
+Migrácie boli následne aplikované na Supabase Cloud; výsledky a stav sú v [zázname z 3. októbra 2026](docs/migrations-applied-2026-10-03.md).
 
 ## Learn More
 

@@ -8,6 +8,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 
 import { HomeBottomNav } from "@/components/home/home-bottom-nav";
 import { HomeFiltersDrawer } from "@/components/feed/home-filters-drawer";
+import { WantedFiltersDrawer } from "@/components/wanted/wanted-filters-drawer";
 import { searchPlantTaxa } from "@/lib/actions/plant-search";
 
 type AppShellProps = {
@@ -31,10 +32,16 @@ export function AppShell({
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const isFullSearchRoute = pathname === "/search";
+  const isWantedFeedRoute = pathname === "/wanted";
+  const isInboxRoute = pathname === "/inbox";
+  const isCreateRoute = pathname === "/create";
+  const isChatThreadRoute = /^\/chat\/[^/]+$/.test(pathname ?? "");
   const isListingDetailRoute = /^\/listing\/[^/]+$/.test(pathname ?? "");
-  const showHeader = !isListingDetailRoute;
-  const showBottomNav = !isListingDetailRoute;
-  const searchAction = "/search";
+  const isWantedDetailRoute = /^\/wanted\/[^/]+$/.test(pathname ?? "");
+  const isDetailRoute = isListingDetailRoute || isWantedDetailRoute || isChatThreadRoute;
+  const showHeader = !isDetailRoute && !isInboxRoute && !isCreateRoute;
+  const showBottomNav = !isDetailRoute && !isCreateRoute;
+  const searchAction = isWantedFeedRoute ? "/wanted" : "/search";
   const searchValue = searchParams.get("q") ?? "";
   const [query, setQuery] = useState(searchValue);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -61,6 +68,7 @@ export function AppShell({
 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
+    let active = true;
 
     const term = query.trim();
     if (term.length < 2) {
@@ -73,12 +81,14 @@ export function AppShell({
       setSearchLoading(true);
       searchPlantTaxa(term)
         .then((items) => {
-          setSearchResults(items.map((item) => item.canonical_name));
+          if (active) setSearchResults(items.map((item) => item.canonical_name));
         })
-        .finally(() => setSearchLoading(false));
+        .catch(() => { if (active) setSearchResults([]); })
+        .finally(() => { if (active) setSearchLoading(false); });
     }, 260);
 
     return () => {
+      active = false;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query]);
@@ -90,7 +100,7 @@ export function AppShell({
     if (term) params.set("q", term);
     else params.delete("q");
     const qs = params.toString();
-    router.push(qs ? `/search?${qs}` : "/search", { scroll: false });
+    router.push(qs ? `${searchAction}?${qs}` : searchAction, { scroll: false });
     setSearchOpen(false);
   };
 
@@ -117,7 +127,7 @@ export function AppShell({
                     width={104}
                     height={32}
                     priority
-                    className="h-[31px] w-[104px]"
+                    className="h-auto w-[104px]"
                   />
                 </Link>
               </div>
@@ -144,16 +154,16 @@ export function AppShell({
                         type="search"
                         name="q"
                         value={query}
-                        readOnly={!isFullSearchRoute}
+                        readOnly={!isFullSearchRoute && !isWantedFeedRoute}
                         onFocus={() => {
-                          if (!isFullSearchRoute) {
+                          if (!isFullSearchRoute && !isWantedFeedRoute) {
                             submitSearch(query);
                             return;
                           }
                           setSearchOpen(true);
                         }}
                         onChange={(event) => {
-                          if (!isFullSearchRoute) return;
+                          if (!isFullSearchRoute && !isWantedFeedRoute) return;
                           setQuery(event.target.value);
                           setSearchOpen(true);
                         }}
@@ -197,7 +207,11 @@ export function AppShell({
                   ) : null}
                 </div>
 
-                <HomeFiltersDrawer iconSrc="/figma-header/filter-icon.svg" />
+                {isWantedFeedRoute ? (
+                  <WantedFiltersDrawer iconSrc="/figma-header/filter-icon.svg" />
+                ) : (
+                  <HomeFiltersDrawer iconSrc="/figma-header/filter-icon.svg" />
+                )}
               </div>
             </div>
           </header>
@@ -205,7 +219,7 @@ export function AppShell({
 
         <main
           className={
-            isListingDetailRoute
+            isDetailRoute || isCreateRoute
               ? "flex-1 pb-0"
               : "flex-1 px-4 pt-3 pb-[calc(5.6rem+env(safe-area-inset-bottom))]"
           }

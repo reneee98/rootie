@@ -13,18 +13,23 @@ import {
 } from "@/lib/data/profile";
 import { getReviewableListings } from "@/lib/data/reviews";
 import { getUser } from "@/lib/auth";
+import { isUuidLike } from "@/lib/validators";
 
 type ProfilePageProps = {
   params: Promise<{ userId: string }>;
+  searchParams: Promise<{ error?: string }>;
 };
 
-export default async function ProfilePage({ params }: ProfilePageProps) {
+export default async function ProfilePage({ params, searchParams }: ProfilePageProps) {
   const { userId } = await params;
+  if (!isUuidLike(userId)) notFound();
+  const { error } = await searchParams;
+  const currentUserPromise = getUser();
   const [profile, listings, currentUser, reviewableListings] = await Promise.all([
     getProfileByUserId(userId),
     getActiveListingsBySeller(userId),
-    getUser(),
-    getUser().then((u) =>
+    currentUserPromise,
+    currentUserPromise.then((u) =>
       u ? getReviewableListings(userId, u.id) : Promise.resolve([])
     ),
   ]);
@@ -63,6 +68,9 @@ export default async function ProfilePage({ params }: ProfilePageProps) {
       description={location ?? "Profil bez vyplnenej lokality."}
       contentClassName="space-y-6"
     >
+      {error === "thread" && <p role="alert" className="rootie-surface p-4 text-sm text-destructive">
+        Konverzáciu sa nepodarilo vytvoriť. Skúste to znova.
+      </p>}
       <Card>
         <CardHeader className="space-y-4">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">

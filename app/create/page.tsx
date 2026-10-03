@@ -13,11 +13,13 @@ export default async function CreatePage() {
     .single();
 
   return (
-    <main className="min-h-dvh bg-background">
-      <WizardShell
-        userId={user.id}
-        defaultRegion={profile?.region ?? ""}
-      />
+    <main className="min-h-dvh px-4 py-6 pb-28">
+      <div className="mx-auto max-w-md">
+        <WizardShell
+          userId={user.id}
+          defaultRegion={profile?.region ?? ""}
+        />
+      </div>
     </main>
   );
 }

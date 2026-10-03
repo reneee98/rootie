@@ -33,9 +33,9 @@ test.describe("Chat – viditeľnosť správ medzi dvoma používateľmi", () =>
 
       await page
         .locator('input[type="file"]')
-        .nth(1)
+        .first()
         .setInputFiles("e2e/fixtures/test-image.png");
-      await page.waitForTimeout(800);
+      await expect(page.getByText(/1\/10 fotiek/)).toBeVisible();
       await page.getByRole("button", { name: "Ďalej" }).click();
 
       await page.getByLabel("Názov rastliny").fill("Chat test Monstera");
@@ -55,7 +55,7 @@ test.describe("Chat – viditeľnosť správ medzi dvoma používateľmi", () =>
 
     await test.step("Kupujúci otvorí inzerát a začne konverzáciu", async () => {
       await page.goto("/me");
-      await page.getByRole("button", { name: "Sign out" }).click();
+      await page.getByRole("button", { name: "Odhlásiť sa" }).click();
       await page.goto("/login");
       await page.getByPlaceholder("vas@email.sk").fill(KUPUJUCI_EMAIL);
       await page.getByPlaceholder("••••••••").fill(KUPUJUCI_PASSWORD);
@@ -64,8 +64,11 @@ test.describe("Chat – viditeľnosť správ medzi dvoma používateľmi", () =>
 
       await page.goto(listingUrl);
       await page
-        .getByRole("button", { name: "Napísať predajcovi" })
+        .getByRole("link", { name: "Poslať ponuku", exact: true })
         .click();
+      await expect(page).toHaveURL(/\/listing\/[a-f0-9-]+\/offer/);
+      await page.getByLabel("Suma (€)").fill("10");
+      await page.getByRole("button", { name: "Odoslať ponuku", exact: true }).click();
       await expect(page).toHaveURL(/\/chat\/[a-f0-9-]+/, { timeout: 10000 });
     });
 
@@ -81,7 +84,7 @@ test.describe("Chat – viditeľnosť správ medzi dvoma používateľmi", () =>
 
     await test.step("Predajca sa prihlási, otvorí Správy a konverzáciu", async () => {
       await page.goto("/me");
-      await page.getByRole("button", { name: "Sign out" }).click();
+      await page.getByRole("button", { name: "Odhlásiť sa" }).click();
       await page.goto("/login");
       await page.getByPlaceholder("vas@email.sk").fill(PREDAJCA_EMAIL);
       await page.getByPlaceholder("••••••••").fill(PREDAJCA_PASSWORD);
@@ -110,7 +113,7 @@ test.describe("Chat – viditeľnosť správ medzi dvoma používateľmi", () =>
 
     await test.step("Kupujúci znova otvorí chat a vidí odpoveď predajcu", async () => {
       await page.goto("/me");
-      await page.getByRole("button", { name: "Sign out" }).click();
+      await page.getByRole("button", { name: "Odhlásiť sa" }).click();
       await page.goto("/login");
       await page.getByPlaceholder("vas@email.sk").fill(KUPUJUCI_EMAIL);
       await page.getByPlaceholder("••••••••").fill(KUPUJUCI_PASSWORD);

@@ -1,6 +1,6 @@
 -- Listing lifecycle update: add "reserved" status and sync listing status from order state.
 
-alter type public.listing_status add value if not exists 'reserved';
+-- The preceding migration commits the reserved enum value first.
 
 -- Indexes for frequent status filters in public feed and /me sections.
 create index if not exists idx_listings_seller_status_created

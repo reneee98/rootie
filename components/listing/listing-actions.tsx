@@ -56,7 +56,7 @@ export function ListingActions({
         <div className="mx-auto flex max-w-md items-center gap-2 px-4 py-3">
           {isOwnListing ? (
             <Button asChild className="flex-1" size="lg">
-              <Link href={`/listing/${listingId}/edit`}>Upraviť inzerát</Link>
+              <Link href="/me/listings">Spravovať inzeráty</Link>
             </Button>
           ) : isAuction ? (
             <p className="text-muted-foreground flex-1 py-2 text-center text-sm">

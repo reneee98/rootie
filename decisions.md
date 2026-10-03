@@ -77,3 +77,9 @@
 **2026-02-10 — Accepted — Homepage feed is listings-only; “Hľadám” stays on `/wanted`** — Mixing wanted requests into home made browsing confusing — Home now queries/listing cards only (fixed + auction), while wanted search/discovery remains on dedicated `/wanted`.
 
 **2026-02-10 — Accepted — Tiny/invalid images are treated as missing photos in UI** — Test data and some uploads can produce 1x1 transparent PNGs that looked like gray cards — Feed cards and listing gallery detect tiny images and render explicit “Bez fotky” fallback instead of blank gray surfaces.
+
+**2026-10-02 — Implemented locally — Business rules enforced in PostgreSQL** — Direct API calls must obey the same auction, block, review and order rules as the UI — Supersedes the earlier app-only review eligibility and accepted auction race conditions. Bids lock the listing; reviews require a delivered buyer order; privileged profile fields are protected. Cloud activation requires the integrity migration.
+
+**2026-10-02 — Implemented locally — Atomic order and auction transitions** — Partial writes could reserve a listing without a usable order or chat — Agreement, order, listing state and status message commit together through RPC. Auction winners start at `reserved` and follow the existing shipping flow. Retries do not duplicate state messages.
+
+**2026-10-02 — Implemented locally — Private phone access and account-scoped drafts** — Public profile access must not expose an opted-out phone; switching accounts must not publish another user's draft — Phone access uses limited public columns and dedicated RPC. Draft keys include the user ID; legacy photo drafts are adopted only when ownership can be established.

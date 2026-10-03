@@ -4,22 +4,20 @@ import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 
-type InboxRealtimeSyncProps = {
-  threadIds: string[];
-};
-
 /**
  * Subscribes to new messages; when a message arrives in any of the user's threads,
  * refreshes the inbox so the list and last message preview update in realtime.
  */
-export function InboxRealtimeSync({ threadIds }: InboxRealtimeSyncProps) {
+export function InboxRealtimeSync() {
   const router = useRouter();
 
   useEffect(() => {
-    if (threadIds.length === 0) return;
-
-    const idsSet = new Set(threadIds);
     const supabase = createSupabaseBrowserClient();
+    let refreshTimer: ReturnType<typeof setTimeout> | null = null;
+    const refresh = () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshTimer = setTimeout(() => router.refresh(), 150);
+    };
     const channel = supabase
       .channel("inbox-messages")
       .on(
@@ -29,24 +27,28 @@ export function InboxRealtimeSync({ threadIds }: InboxRealtimeSyncProps) {
           schema: "public",
           table: "messages",
         },
-        (payload) => {
-          const row = payload.new as Record<string, unknown>;
-          const threadId = row?.thread_id as string | undefined;
-          if (threadId && idsSet.has(threadId)) {
-            router.refresh();
-          }
-        }
+        // Realtime applies RLS; include newly-created threads as well.
+        refresh
       )
       .subscribe();
+    const refreshVisible = () => {
+      if (document.visibilityState === "visible") refresh();
+    };
+    document.addEventListener("visibilitychange", refreshVisible);
+    window.addEventListener("focus", refreshVisible);
+    const interval = setInterval(refreshVisible, 15000);
 
     return () => {
+      if (refreshTimer) clearTimeout(refreshTimer);
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", refreshVisible);
+      window.removeEventListener("focus", refreshVisible);
       const channelToRemove = channel;
       setTimeout(() => {
         supabase.removeChannel(channelToRemove);
       }, 0);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- stable string key avoids array reference inequality; threadIds is captured inside the effect
-  }, [router, threadIds.slice().sort().join(",")]);
+  }, [router]);
 
   return null;
 }

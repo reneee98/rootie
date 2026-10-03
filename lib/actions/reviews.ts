@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { getUser } from "@/lib/auth";
 import { getReviewEligibility } from "@/lib/data/reviews";
+import { markOrderDelivered } from "@/lib/actions/orders";
 
 export type ConfirmDealResult =
   | { ok: true }
@@ -90,16 +91,6 @@ export type ConfirmOrderDeliveredResult =
   | { ok: true }
   | { ok: false; error: string };
 
-function isMissingThreadOrderDeliveredAtColumnError(
-  error: { code?: string; message?: string } | null
-): boolean {
-  if (!error) return false;
-
-  const isMissingColumnCode =
-    error.code === "42703" || error.code === "PGRST204";
-  return isMissingColumnCode && (error.message ?? "").includes("order_delivered_at");
-}
-
 /**
  * Buyer confirms that the order was delivered. Only buyer (non-seller) in a listing thread
  * can confirm; deal must already be confirmed. Idempotent.
@@ -107,60 +98,7 @@ function isMissingThreadOrderDeliveredAtColumnError(
 export async function confirmOrderDelivered(
   threadId: string
 ): Promise<ConfirmOrderDeliveredResult> {
-  const user = await getUser();
-  if (!user) return { ok: false, error: "Prihláste sa" };
-
-  const supabase = await createSupabaseServerClient();
-
-  const { data: thread, error: threadErr } = await supabase
-    .from("threads")
-    .select("id, user1_id, user2_id, context_type, listing_id, deal_confirmed_at")
-    .eq("id", threadId)
-    .single();
-
-  if (threadErr || !thread) {
-    return { ok: false, error: "Konverzácia neexistuje" };
-  }
-
-  const isParticipant =
-    thread.user1_id === user.id || thread.user2_id === user.id;
-  if (!isParticipant) {
-    return { ok: false, error: "Nie ste účastník konverzácie" };
-  }
-
-  if (thread.context_type !== "listing" || !thread.listing_id) {
-    return { ok: false, error: "Doručenie môžete potvrdiť len v konverzácii k inzerátu." };
-  }
-
-  if (!thread.deal_confirmed_at) {
-    return { ok: false, error: "Dohoda ešte nebola potvrdená." };
-  }
-
-  const { data: listing } = await supabase
-    .from("listings")
-    .select("seller_id")
-    .eq("id", thread.listing_id)
-    .single();
-
-  if (listing?.seller_id === user.id) {
-    return { ok: false, error: "Doručenie môže potvrdiť len kupujúci." };
-  }
-
-  const { error: updateErr } = await supabase
-    .from("threads")
-    .update({
-      order_delivered_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", threadId);
-
-  if (updateErr && !isMissingThreadOrderDeliveredAtColumnError(updateErr)) {
-    return { ok: false, error: updateErr.message };
-  }
-
-  revalidatePath(`/chat/${threadId}`);
-  revalidatePath("/inbox");
-  return { ok: true };
+  return markOrderDelivered(threadId);
 }
 
 export type SubmitReviewResult = { ok: true } | { ok: false; error: string };
@@ -178,7 +116,7 @@ export async function submitReview(
   const user = await getUser();
   if (!user) return { ok: false, error: "Prihláste sa" };
 
-  if (rating < 1 || rating > 5) {
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
     return { ok: false, error: "Hodnotenie musí byť 1–5" };
   }
 

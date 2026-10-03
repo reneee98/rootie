@@ -2,7 +2,7 @@
 
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { requireUser } from "@/lib/auth";
-import { SLOVAK_REGIONS } from "@/lib/regions";
+import { validateCreateListingInput } from "@/lib/create-listing-validation";
 
 export type CreateListingInput = {
   type: "fixed" | "auction";
@@ -33,36 +33,16 @@ export async function publishListing(
   const supabase = await createSupabaseServerClient();
 
   /* ---------- validation ---------- */
-  if (!input.plantName.trim()) {
-    return { ok: false, error: "Názov rastliny je povinný." };
-  }
+  const validationError = validateCreateListingInput(input);
+  if (validationError) return { ok: false, error: validationError };
 
-  if (
-    !input.region ||
-    !(SLOVAK_REGIONS as readonly string[]).includes(input.region)
-  ) {
-    return { ok: false, error: "Vyberte platný kraj." };
-  }
-
-  if (input.photoUrls.length === 0) {
-    return { ok: false, error: "Pridajte aspoň jednu fotku." };
-  }
-
-  if (input.type === "fixed") {
-    if (!input.fixedPrice || input.fixedPrice <= 0) {
-      return { ok: false, error: "Zadajte platnú cenu." };
-    }
-  } else {
-    if (!input.auctionStartPrice || input.auctionStartPrice <= 0) {
-      return { ok: false, error: "Zadajte platnú začiatočnú cenu." };
-    }
-    if (!input.auctionMinIncrement || input.auctionMinIncrement <= 0) {
-      return { ok: false, error: "Zadajte platný minimálny príhoz." };
-    }
-    if (!input.auctionEndsAt) {
-      return { ok: false, error: "Vyberte dobu trvania aukcie." };
-    }
-  }
+  // A listing may reference only this user's uploaded photos from this project.
+  const storageOrigin = new URL(process.env.SUPABASE_URL ?? process.env.NEXT_PUBLIC_SUPABASE_URL!).origin;
+  const photoPrefix = `/storage/v1/object/public/listing-photos/${user.id}/`;
+  if (input.photoUrls.some((value) => {
+    const url = new URL(value);
+    return url.origin !== storageOrigin || !url.pathname.startsWith(photoPrefix);
+  })) return { ok: false, error: "Použite fotky nahrané k tomuto inzerátu." };
 
   /* ---------- insert listing ---------- */
   const { data: listing, error: listingError } = await supabase
@@ -112,6 +92,14 @@ export async function publishListing(
 
     if (photosError) {
       console.error("Photos insert error:", photosError);
+      // Publishing must never claim success with a listing missing every photo.
+      const { error: cleanupError } = await supabase.from("listings").delete().eq("id", listing.id).eq("seller_id", user.id);
+      if (cleanupError) {
+        const { error: removalError } = await supabase.from("listings").update({ status: "removed" }).eq("id", listing.id).eq("seller_id", user.id);
+        console.error("Incomplete listing cleanup error:", cleanupError);
+        if (removalError) return { ok: false, error: "Fotky sa nepodarilo uložiť a inzerát odstrániť. Skontrolujte svoje inzeráty." };
+      }
+      return { ok: false, error: "Fotky sa nepodarilo uložiť. Inzerát nebol zverejnený, skúste to znova." };
     }
   }
 

@@ -45,8 +45,12 @@ Máš dve možnosti.
 ### A) Supabase Dashboard — SQL Editor
 
 1. V Supabase Dashboard otvor **SQL Editor**.
-2. Súbory z `supabase/migrations/` spusti **v poradí podľa čísla v názve** (od `20260209100000_schema.sql` po `20260209100014_phone_verification.sql`).
+2. Súbory z `supabase/migrations/` spusti **v poradí podľa čísla v názve**, vrátane migrácií objednávok z 10. februára, `20261002120000_backend_integrity.sql` a `20261003080000_profile_derived_stats_backfill.sql`. Pri existujúcom projekte najprv skontroluj históriu už aplikovaných migrácií; neopakuj počiatočnú schému.
 3. Pre každý súbor: otvor ho, skopíruj obsah, vlož do SQL Editora a spusti **Run**.
+
+`20260210150000_listing_reserved_status.sql` musí úspešne skončiť a commitnúť sa pred spustením `20260210152000_listing_lifecycle_reserved.sql`. PostgreSQL nepovolí použiť novo pridanú enum hodnotu `reserved` pred commitom transakcie, ktorá ju pridala ([PostgreSQL ALTER TYPE](https://www.postgresql.org/docs/17/sql-altertype.html)). Ak už projekt lifecycle migráciu aplikoval, enum migrácia je bezpečná vďaka `ADD VALUE IF NOT EXISTS`.
+
+Októbrová migrácia pridáva atomicitu dohôd a ukončenia aukcií, kontrolu ponúk a recenzií v databáze, ochranu rolí a súkromných telefónov. Bez nej nové akcie dohôd a cron nemajú potrebné RPC. Pred aplikovaním skontroluj prípadné duplicitné konverzácie s obráteným poradím účastníkov; nové indexy povoľujú iba jednu konverzáciu na dvojicu a inzerát/požiadavku. Údaje s prípadnými duplicitami treba zlúčiť so zachovaním správ, nie zmazať naslepo.
 
 ### B) Supabase CLI (ak máš nainštalovanú)
 
@@ -57,10 +61,13 @@ Máš dve možnosti.
    supabase link --project-ref TvojProjektRef
    ```
    `TvojProjektRef` je časť URL (napr. z `https://abcdefgh.supabase.co` je ref `abcdefgh`). Heslo k DB zadal pri vytvorení projektu.
-3. Push migrácií:
+3. Over plán a potom spusti migrácie:
    ```bash
+   supabase db push --dry-run
    supabase db push
    ```
+
+Ak je nová enum migrácia staršia než posledná aplikovaná verzia v histórii, CLI môže požadovať `--include-all`. Najprv over históriu a plán migrácií cez `supabase db push --include-all --dry-run`; tento prepínač zahŕňa iba migrácie chýbajúce vo vzdialenej histórii ([Supabase CLI](https://supabase.com/docs/reference/cli/v1/supabase-db-push)).
 
 ## 5. Seed (voliteľné)
 
@@ -76,6 +83,9 @@ Storage bucket a politiky sú v migrácii `20260209100003_storage_policies.sql`.
 1. Spusti appku: `npm run dev`
 2. Skús registráciu / prihlásenie — mal by si byť schopný vytvoriť účet a byť presmerovaný do appky.
 3. V Supabase Dashboard → **Table Editor** by si mal vidieť záznam v `profiles` po prvom prihlásení (trigger z migrácie vytvorí profil).
+4. Spusti `npm test`; potom na testovacom projekte over prijatie ponuky → adresu → odoslanie → doručenie → recenziu a ukončenie aukcie cez autorizovaný cron. Verejné API bez prihlásenia musí odmietnuť súkromné dáta; telefón je dostupný iba vlastníkovi alebo pri povolenom a overenom verejnom zobrazení.
+
+Migrácie boli 3. októbra 2026 aplikované na existujúci Supabase Cloud, zapísané do histórie a overené. Podrobný stav a cloudové testy sú v [zázname aplikovania](migrations-applied-2026-10-03.md); pôvodná lokálna kontrola je v [zázname overenia](verification-2026-10-02.md).
 
 ## Časté problémy
 

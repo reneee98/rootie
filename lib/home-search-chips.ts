@@ -1,0 +1,16 @@
+export const HOME_SEARCH_CHIPS = [
+  "Monstera",
+  "Philodendron",
+  "Hoya",
+  "Anthurium",
+  "Alocasia",
+  "Syngonium",
+  "Pothos",
+  "Scindapsus",
+  "Calathea",
+  "Begonia",
+  "Orchid",
+  "Ficus",
+  "Cactus",
+  "Sukulenty",
+] as const;

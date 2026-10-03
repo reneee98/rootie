@@ -38,6 +38,8 @@ export function ListingCtaBar({
   bidCount = 0,
 }: ListingCtaBarProps) {
   const isSold = status === "sold";
+  const isReserved = status === "reserved";
+  const inactiveLabel = isSold ? "Predané" : isReserved ? "Rezervované" : "Inzerát už nie je aktívny";
   const wrapperClass =
     "fixed bottom-0 left-0 right-0 z-40 bg-[#faf8f4] px-[14px] pt-[15px] pb-[calc(14px+env(safe-area-inset-bottom))] shadow-[0_-25px_50px_rgba(0,0,0,0.25)]";
   const ctaButtonClass =
@@ -48,7 +50,7 @@ export function ListingCtaBar({
       <div className={wrapperClass}>
         <div className="mx-auto flex max-w-md">
           <Button asChild className={ctaButtonClass} size="lg">
-            <Link href={`/listing/${listingId}/edit`}>Upraviť inzerát</Link>
+            <Link href="/me/listings">Spravovať inzeráty</Link>
           </Button>
         </div>
       </div>
@@ -59,7 +61,7 @@ export function ListingCtaBar({
     return (
       <div className={wrapperClass}>
         <div className="mx-auto flex max-w-md">
-          {isSold ? (
+          {isSold || isReserved ? (
             isAuctionWinner ? (
               isAuthenticated ? (
                 <form action={getOrCreateListingThreadFormAction} className="w-full">
@@ -79,10 +81,10 @@ export function ListingCtaBar({
               )
             ) : (
               <div className="flex h-[49px] w-full items-center justify-center rounded-[14px] border border-[#d6cfbc] bg-[#faf8f4] text-sm text-[#67635c]">
-                Predané
+                {inactiveLabel}
               </div>
             )
-          ) : auctionEnded ? (
+          ) : auctionEnded || status !== "active" ? (
             <div className="flex h-[49px] w-full items-center justify-center rounded-[14px] border border-[#d6cfbc] bg-[#faf8f4] text-sm text-[#67635c]">
               Aukcia skončila
             </div>
@@ -108,9 +110,9 @@ export function ListingCtaBar({
   return (
     <div className={wrapperClass}>
       <div className="mx-auto flex max-w-md">
-        {isSold ? (
+        {status !== "active" ? (
           <div className="flex h-[49px] w-full items-center justify-center rounded-[14px] border border-[#d6cfbc] bg-[#faf8f4] text-sm text-[#67635c]">
-            Predané
+            {inactiveLabel}
           </div>
         ) : isAuthenticated ? (
           <Button asChild className={ctaButtonClass} size="lg">

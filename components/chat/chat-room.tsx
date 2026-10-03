@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useLayoutEffect, useRef, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { markThreadRead } from "@/lib/actions/chat";
@@ -14,6 +14,7 @@ import type { ThreadDealState, ReviewEligibility } from "@/lib/data/reviews";
 import type { ThreadOrder, ProfileShippingAddress } from "@/lib/data/orders";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { mergeChatMessages, confirmOptimisticChatMessage } from "@/lib/chat-message-state";
 
 type ChatRoomProps = {
   thread: ThreadDetail;
@@ -26,6 +27,7 @@ type ChatRoomProps = {
   reviewEligibility?: ReviewEligibility | null;
   listingSellerId?: string | null;
   listingType?: "fixed" | "auction";
+  listingSwapEnabled?: boolean;
   canSendText?: boolean;
   sendTextBlockedReason?: string | null;
   hasBuyerReviewed?: boolean | null;
@@ -44,6 +46,7 @@ export function ChatRoom({
   reviewEligibility,
   listingSellerId,
   listingType,
+  listingSwapEnabled = false,
   canSendText = true,
   sendTextBlockedReason,
   hasBuyerReviewed,
@@ -57,18 +60,34 @@ export function ChatRoom({
   const [syncWarning, setSyncWarning] = useState<string | null>(null);
   const scrollBottomRef = useRef<HTMLDivElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
-  const optimisticTempIdRef = useRef<string | null>(null);
   const messagesRef = useRef<ChatMessage[]>(initialMessages);
+  const olderScrollHeightRef = useRef<number | null>(null);
+  const scrollHeightRef = useRef(0);
+  const latestInitialMessage = initialMessages.at(-1);
+  const pollCursorRef = useRef<{ createdAt: string; id?: string }>({
+    createdAt: latestInitialMessage?.created_at ?? "1970-01-01T00:00:00.000Z",
+    id: latestInitialMessage?.id,
+  });
+
+  useEffect(() => {
+    // Server action revalidation updates props without remounting the room.
+    setMessages((current) => mergeChatMessages(current, initialMessages));
+  }, [initialMessages]);
 
   useEffect(() => {
     messagesRef.current = messages;
   }, [messages]);
 
+  const lastRealMessageId = messages.filter((message) => !message.id.startsWith("temp-")).at(-1)?.id;
   useEffect(() => {
-    if (!isModeratorViewOnly) {
-      markThreadRead(thread.id);
-    }
-  }, [thread.id, isModeratorViewOnly]);
+    if (isModeratorViewOnly) return;
+    const readVisibleThread = () => {
+      if (document.visibilityState === "visible") void markThreadRead(thread.id).catch(() => {});
+    };
+    readVisibleThread();
+    document.addEventListener("visibilitychange", readVisibleThread);
+    return () => document.removeEventListener("visibilitychange", readVisibleThread);
+  }, [thread.id, isModeratorViewOnly, lastRealMessageId]);
 
   useEffect(() => {
     const supabase = createSupabaseBrowserClient();
@@ -96,15 +115,8 @@ export function ChatRoom({
               : [],
             created_at: row.created_at as string,
           };
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            const tempId = optimisticTempIdRef.current;
-            if (tempId && newMsg.sender_id === currentUserId) {
-              optimisticTempIdRef.current = null;
-              return prev.filter((m) => m.id !== tempId).concat([newMsg]);
-            }
-            return [...prev, newMsg];
-          });
+          setMessages((prev) => mergeChatMessages(prev, [newMsg]));
+          if (newMsg.message_type === "order_status" || newMsg.message_type === "system") router.refresh();
         }
       )
       .subscribe();
@@ -118,11 +130,18 @@ export function ChatRoom({
         supabase.removeChannel(channelToRemove);
       }, 0);
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps -- currentUserId is stable (auth session), adding it would cause unnecessary channel resubscription
-  }, [thread.id]);
+  }, [thread.id, router]);
 
-  useEffect(() => {
-    scrollBottomRef.current?.scrollIntoView({ behavior: "smooth" });
+  useLayoutEffect(() => {
+    const list = listRef.current;
+    if (!list) return;
+    if (olderScrollHeightRef.current !== null) {
+      list.scrollTop += list.scrollHeight - olderScrollHeightRef.current;
+      olderScrollHeightRef.current = null;
+    } else if (scrollHeightRef.current === 0 || scrollHeightRef.current - list.scrollTop - list.clientHeight < 120) {
+      list.scrollTop = list.scrollHeight;
+    }
+    scrollHeightRef.current = list.scrollHeight;
   }, [messages.length]);
 
   useEffect(() => {
@@ -133,46 +152,28 @@ export function ChatRoom({
 
     const pollNewMessages = async () => {
       if (pending || disposed) return;
-      const latestRealMessage = [...messagesRef.current]
-        .reverse()
-        .find((m) => !m.id.startsWith("temp-"));
-      const url = latestRealMessage?.created_at
-        ? `/api/chat/messages?threadId=${thread.id}&after=${encodeURIComponent(latestRealMessage.created_at)}`
-        : `/api/chat/messages?threadId=${thread.id}`;
+      const params = new URLSearchParams({ threadId: thread.id, after: pollCursorRef.current.createdAt });
+      if (pollCursorRef.current.id) params.set("afterId", pollCursorRef.current.id);
+      const url = `/api/chat/messages?${params}`;
       pending = true;
       try {
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) {
-          setSyncWarning("Správy sa nepodarilo synchronizovať. Skúste obnoviť stránku.");
+          if (!disposed) setSyncWarning("Správy sa nepodarilo synchronizovať. Skúste obnoviť stránku.");
           return;
         }
         const data = (await res.json()) as { messages?: ChatMessage[] };
         const incoming = Array.isArray(data.messages) ? data.messages : [];
         if (disposed) return;
-        if (incoming.length > 0) {
-          setSyncWarning(null);
-        }
+        setSyncWarning(null);
         if (!incoming.length) return;
-
-        setMessages((prev) => {
-          let base = prev;
-          const tempId = optimisticTempIdRef.current;
-          if (
-            tempId &&
-            incoming.some(
-              (m) => m.sender_id === currentUserId && !m.id.startsWith("temp-")
-            )
-          ) {
-            optimisticTempIdRef.current = null;
-            base = prev.filter((m) => m.id !== tempId);
-          }
-
-          const knownIds = new Set(base.map((m) => m.id));
-          const next = incoming.filter((m) => !knownIds.has(m.id));
-          return next.length > 0 ? [...base, ...next] : base;
-        });
+        const newestIncoming = incoming.at(-1);
+        if (newestIncoming) pollCursorRef.current = { createdAt: newestIncoming.created_at, id: newestIncoming.id };
+        const knownIds = new Set(messagesRef.current.map((message) => message.id));
+        if (incoming.some((message) => !knownIds.has(message.id) && ["order_status", "system"].includes(message.message_type))) router.refresh();
+        setMessages((prev) => mergeChatMessages(prev, incoming));
       } catch {
-        setSyncWarning("Pripojenie je nestabilné. Skúšam obnoviť synchronizáciu.");
+        if (!disposed) setSyncWarning("Pripojenie je nestabilné. Skúšam obnoviť synchronizáciu.");
       } finally {
         pending = false;
       }
@@ -186,7 +187,7 @@ export function ChatRoom({
       disposed = true;
       clearInterval(interval);
     };
-  }, [thread.id, isModeratorViewOnly, currentUserId]);
+  }, [thread.id, isModeratorViewOnly, router]);
 
   const loadOlder = useCallback(async () => {
     if (loadingOlder || !hasMore || messages.length === 0) return;
@@ -195,7 +196,7 @@ export function ChatRoom({
     const oldest = messages[0];
     try {
       const res = await fetch(
-        `/api/chat/messages?threadId=${thread.id}&before=${encodeURIComponent(oldest.created_at)}`
+        `/api/chat/messages?threadId=${thread.id}&before=${encodeURIComponent(oldest.created_at)}&beforeId=${encodeURIComponent(oldest.id)}`
       );
       if (!res.ok) {
         setLoadingOlderError("Staršie správy sa nepodarilo načítať.");
@@ -203,7 +204,8 @@ export function ChatRoom({
       }
       const data = await res.json();
       if (data.messages?.length) {
-        setMessages((prev) => [...data.messages, ...prev]);
+        olderScrollHeightRef.current = listRef.current?.scrollHeight ?? null;
+        setMessages((prev) => mergeChatMessages(prev, data.messages));
       }
       setHasMore(data.hasMore ?? false);
     } catch {
@@ -220,7 +222,6 @@ export function ChatRoom({
         ...msg,
         id: tempId,
       };
-      optimisticTempIdRef.current = tempId;
       setMessages((prev) => [...prev, optimistic]);
       return tempId;
     },
@@ -228,8 +229,11 @@ export function ChatRoom({
   );
 
   const removeOptimisticMessage = useCallback((tempId: string) => {
-    optimisticTempIdRef.current = null;
     setMessages((prev) => prev.filter((m) => m.id !== tempId));
+  }, []);
+
+  const confirmOptimisticMessage = useCallback((tempId: string, messageId: string, createdAt: string) => {
+    setMessages((prev) => confirmOptimisticChatMessage(prev, tempId, messageId, createdAt));
   }, []);
 
   const uploadImageUrl = useCallback(
@@ -259,36 +263,21 @@ export function ChatRoom({
       listingSellerId &&
       listingSellerId !== currentUserId
   );
-  const hasOrderStatusMessage = messages.some(
-    (m) =>
-      m.message_type === "order_status" &&
-      (
-        String(m.metadata?.order_status ?? "") === "price_accepted" ||
-        String(m.metadata?.order_status ?? "") === "address_provided" ||
-        String(m.metadata?.order_status ?? "") === "shipped" ||
-        String(m.metadata?.order_status ?? "") === "delivered" ||
-        m.body.toLowerCase().includes("cena odsúhlasená") ||
-        m.body.toLowerCase().includes("výmena odsúhlasená")
-      )
-  );
+  const latestOrderMessage = messages.filter((m) => m.message_type === "order_status").at(-1);
+  const latestOrderStatus = String(latestOrderMessage?.metadata?.order_status ?? "");
   const isOfferFlowLocked = isListingThread
-    ? Boolean(
-        (
-          orderState &&
-          orderState.status !== "negotiating" &&
-          orderState.status !== "cancelled"
-        ) ||
-          hasOrderStatusMessage
-      )
+    ? latestOrderStatus
+      ? ["price_accepted", "address_provided", "shipped", "delivered"].includes(latestOrderStatus)
+      : Boolean(orderState && orderState.status !== "negotiating" && orderState.status !== "cancelled")
     : Boolean(dealState?.dealConfirmedAt);
 
   return (
-    <div className="flex h-dvh flex-col">
-      <ChatHeader thread={thread} />
+    <div className="flex h-dvh flex-col bg-[#f8f4eb]">
+      <ChatHeader thread={thread} readOnly={isModeratorViewOnly} />
 
       {isModeratorViewOnly && (
         <div
-          className="border-b bg-muted/50 px-3 py-2 text-center text-sm text-muted-foreground"
+          className="border-b border-[#e9e2d1] bg-[#f4efe3] px-3 py-2 text-center text-sm text-[#67635c]"
           role="status"
           aria-live="polite"
         >
@@ -305,12 +294,12 @@ export function ChatRoom({
 
       <div
         ref={listRef}
-        className="flex-1 overflow-y-auto px-3 py-4"
+        className="flex-1 overflow-y-auto px-3 py-3"
         role="log"
         aria-live="polite"
       >
         {syncWarning && (
-          <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          <div className="mb-3 rounded-[14px] border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
             {syncWarning}
           </div>
         )}
@@ -323,6 +312,7 @@ export function ChatRoom({
                 size="sm"
                 onClick={loadOlder}
                 disabled={loadingOlder}
+                className="rounded-full border border-[#e9e2d1] bg-[#faf8f4] px-4 text-[#232711] hover:bg-[#f1ece1]"
               >
                 {loadingOlder ? "Načítavam…" : "Staršie správy"}
               </Button>
@@ -337,9 +327,9 @@ export function ChatRoom({
 
         {messages.length === 0 ? (
           <div className="flex min-h-[35vh] items-center justify-center">
-            <div className="max-w-xs rounded-xl border bg-card px-4 py-3 text-center">
-              <p className="text-sm font-medium">Konverzácia je zatiaľ prázdna</p>
-              <p className="mt-1 text-xs text-muted-foreground">
+            <div className="max-w-xs rounded-[16px] border border-[#e9e2d1] bg-[#faf8f4] px-4 py-3 text-center shadow-[0_2px_6px_rgba(0,0,0,0.03)]">
+              <p className="text-sm font-medium text-[#232711]">Konverzácia je zatiaľ prázdna</p>
+              <p className="mt-1 text-xs text-[#67635c]">
                 {canSendText
                   ? "Napíšte prvú správu nižšie."
                   : (sendTextBlockedReason ?? "Písanie v chate je zatiaľ vypnuté.")}
@@ -347,7 +337,7 @@ export function ChatRoom({
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2.5">
             {messages.map((msg) => (
               <MessageBubble
                 key={msg.id}
@@ -355,7 +345,8 @@ export function ChatRoom({
                 isOwn={msg.sender_id === currentUserId}
                 threadId={thread.id}
                 canManageOffers={isSellerInListingThread}
-                dealConfirmed={isOfferFlowLocked}
+                canAcceptPriceCounter={canBuyerSendOffers && msg.sender_id === listingSellerId}
+                dealConfirmed={isOfferFlowLocked || messages.some((reply) => reply.message_type === "system" && reply.metadata?.source_offer_message_id === msg.id && reply.metadata?.action === "declined")}
                 isListingThread={isListingThread}
                 onOrderStateChanged={() => router.refresh()}
                 onSent={() => scrollBottomRef.current?.scrollIntoView({ behavior: "smooth" })}
@@ -387,11 +378,13 @@ export function ChatRoom({
           onSent={() => scrollBottomRef.current?.scrollIntoView({ behavior: "smooth" })}
           uploadImageUrl={uploadImageUrl}
           canBuyerSendOffers={canBuyerSendOffers}
+          canBuyerSendSwapOffers={canBuyerSendOffers && listingSwapEnabled}
           dealConfirmed={isOfferFlowLocked}
-          textMessagingEnabled={canSendText}
+          textMessagingEnabled={canSendText || (listingType === "fixed" && messages.some((message) => message.sender_id !== listingSellerId && ["offer_price", "offer_swap"].includes(message.message_type)))}
           textMessagingDisabledReason={sendTextBlockedReason ?? undefined}
           addOptimisticMessage={addOptimisticMessage}
           removeOptimisticMessage={removeOptimisticMessage}
+          confirmOptimisticMessage={confirmOptimisticMessage}
         />
       )}
     </div>

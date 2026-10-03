@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
 import { updateProfilePhone, syncPhoneVerifiedFromAuth } from "@/lib/actions/profile";
+import { normalizePhone } from "@/lib/phone";
 
 const PHONE_VERIFICATION_ENABLED =
   process.env.NEXT_PUBLIC_PHONE_VERIFICATION_ENABLED === "true";
@@ -29,71 +30,86 @@ export function PhoneVerificationSection({
   const [saveStatus, setSaveStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [saveError, setSaveError] = useState<string | null>(null);
 
-  const [otpStep, setOtpStep] = useState<"idle" | "sent" | "verifying">("idle");
+  const [otpStep, setOtpStep] = useState<"idle" | "sending" | "sent" | "verifying">("idle");
+  const [otpPhone, setOtpPhone] = useState<string | null>(null);
   const [otpCode, setOtpCode] = useState("");
   const [otpError, setOtpError] = useState<string | null>(null);
   const router = useRouter();
+  const phoneVerified = initialPhoneVerified && normalizePhone(phone) !== null &&
+    normalizePhone(phone) === normalizePhone(initialPhone);
 
   const handleSavePhoneAndPreferences = async () => {
     setSaveStatus("loading");
     setSaveError(null);
-    const result = await updateProfilePhone(
-      phone.trim() || null,
-      showPhoneOnListing
-    );
-    setSaveStatus(result.ok ? "success" : "error");
-    if (!result.ok) setSaveError(result.error);
+    try {
+      const result = await updateProfilePhone(phone.trim() || null, showPhoneOnListing);
+      setSaveStatus(result.ok ? "success" : "error");
+      if (!result.ok) setSaveError(result.error);
+      else router.refresh();
+    } catch {
+      setSaveStatus("error");
+      setSaveError("Číslo sa nepodarilo uložiť. Skúste to znova.");
+    }
   };
 
   const handleSendOtp = async () => {
-    const raw = phone.trim();
-    if (!raw) return;
-    const normalized = raw.startsWith("+") ? raw : `+421${raw.replace(/\D/g, "")}`;
-    if (normalized.length < 10) {
+    const normalized = normalizePhone(phone);
+    if (!normalized) {
       setOtpError("Zadajte platné číslo (napr. 901 234 567 alebo +421901234567)");
       return;
     }
     setOtpError(null);
-    setOtpStep("sent");
-    const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.updateUser({ phone: normalized });
-    if (error) {
-      setOtpError(error.message);
+    setOtpStep("sending");
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase.auth.updateUser({ phone: normalized });
+      if (error) {
+        setOtpError(error.message);
+        setOtpStep("idle");
+        return;
+      }
+      setOtpPhone(normalized);
+      setOtpCode("");
+      setOtpStep("sent");
+    } catch {
+      setOtpError("Overovací kód sa nepodarilo odoslať. Skúste to znova.");
       setOtpStep("idle");
-      return;
     }
-    setOtpCode("");
   };
 
   const handleVerifyOtp = async () => {
-    const raw = phone.trim();
-    const normalized = raw.startsWith("+") ? raw : `+421${raw.replace(/\D/g, "")}`;
-    if (!otpCode.trim() || otpCode.trim().length < 4) {
+    if (!otpPhone || !/^\d{6}$/.test(otpCode.trim())) {
       setOtpError("Zadajte kód z SMS");
       return;
     }
     setOtpError(null);
     setOtpStep("verifying");
-    const supabase = createSupabaseBrowserClient();
-    const { error } = await supabase.auth.verifyOtp({
-      phone: normalized,
-      token: otpCode.trim(),
-      type: "phone_change",
-    });
-    if (error) {
-      setOtpError(error.message);
-      setOtpStep("sent");
-      return;
-    }
-    const sync = await syncPhoneVerifiedFromAuth();
-    setOtpStep("idle");
-    setOtpCode("");
-    if (sync.ok) {
-      setSaveStatus("success");
-      setSaveError(null);
-      router.refresh();
-    } else {
-      setOtpError(sync.error);
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error } = await supabase.auth.verifyOtp({
+        phone: otpPhone,
+        token: otpCode.trim(),
+        type: "phone_change",
+      });
+      if (error) {
+        setOtpError(error.message);
+        setOtpStep("sent");
+        return;
+      }
+      const sync = await syncPhoneVerifiedFromAuth();
+      if (sync.ok) {
+        setPhone(otpPhone);
+        setOtpStep("idle");
+        setOtpCode("");
+        setSaveStatus("success");
+        setSaveError(null);
+        router.refresh();
+      } else {
+        setOtpError(sync.error);
+        setOtpStep("idle");
+      }
+    } catch {
+      setOtpError("Overenie sa nepodarilo. Skúste to znova.");
       setOtpStep("sent");
     }
   };
@@ -103,7 +119,7 @@ export function PhoneVerificationSection({
       <div className="flex items-center gap-2">
         <Smartphone className="text-muted-foreground size-5" aria-hidden />
         <h2 className="text-sm font-semibold">Telefón a overenie</h2>
-        {initialPhoneVerified && (
+        {phoneVerified && (
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
             <ShieldCheck className="size-3" aria-hidden />
             Overené
@@ -113,8 +129,8 @@ export function PhoneVerificationSection({
 
       {!PHONE_VERIFICATION_ENABLED && (
         <p className="text-muted-foreground text-sm">
-          Overenie telefónu vyžaduje nastavenie SMS poskytovateľa (Supabase Auth).
-          Číslo si môžete uložiť; po zapnutí overenia ho budete môcť overiť OTP.
+          Overenie cez SMS momentálne nie je dostupné. Číslo si môžete uložiť;
+          na inzerátoch sa zobrazí až po overení.
         </p>
       )}
 
@@ -129,7 +145,12 @@ export function PhoneVerificationSection({
           autoComplete="tel"
           placeholder="+421 901 234 567"
           value={phone}
-          onChange={(e) => setPhone(e.target.value)}
+          onChange={(e) => {
+            setPhone(e.target.value);
+            setSaveStatus("idle");
+            setOtpError(null);
+          }}
+          disabled={otpStep !== "idle" || saveStatus === "loading"}
           aria-describedby="me-phone-hint"
           className="max-w-[280px]"
         />
@@ -138,17 +159,18 @@ export function PhoneVerificationSection({
         </p>
       </div>
 
-      {PHONE_VERIFICATION_ENABLED && !initialPhoneVerified && phone.trim() && (
+      {PHONE_VERIFICATION_ENABLED && !phoneVerified && phone.trim() && (
         <div className="space-y-2">
-          {otpStep === "idle" && (
+          {(otpStep === "idle" || otpStep === "sending") && (
             <Button
               type="button"
               variant="outline"
               size="sm"
               onClick={handleSendOtp}
+              disabled={otpStep === "sending" || saveStatus === "loading"}
               aria-label="Odoslať overovací kód na telefón"
             >
-              Odoslať overovací kód
+              {otpStep === "sending" ? "Odosielam…" : "Odoslať overovací kód"}
             </Button>
           )}
           {(otpStep === "sent" || otpStep === "verifying") && (
@@ -180,18 +202,15 @@ export function PhoneVerificationSection({
                   {otpStep === "verifying" ? "Overujem…" : "Overiť"}
                 </Button>
               </div>
-              {otpError && (
-                <p id="me-otp-error" className="text-destructive text-sm" role="alert">
-                  {otpError}
-                </p>
-              )}
               <Button
                 type="button"
                 variant="ghost"
                 size="sm"
+                disabled={otpStep === "verifying"}
                 onClick={() => {
                   setOtpStep("idle");
                   setOtpCode("");
+                  setOtpPhone(null);
                   setOtpError(null);
                 }}
               >
@@ -200,6 +219,10 @@ export function PhoneVerificationSection({
             </div>
           )}
         </div>
+      )}
+
+      {otpError && (
+        <p id="me-otp-error" className="text-destructive text-sm" role="alert">{otpError}</p>
       )}
 
       <div className="flex items-start gap-2">
@@ -219,7 +242,7 @@ export function PhoneVerificationSection({
             Zobrazovať telefón na inzerátoch
           </label>
           <p id="me-show-phone-hint" className="text-muted-foreground text-xs">
-            {initialPhoneVerified
+            {phoneVerified
               ? "Kupujúci uvidia vaše číslo na stránke inzerátu."
               : "Bude zobrazené až po overení čísla."}
           </p>
@@ -231,7 +254,7 @@ export function PhoneVerificationSection({
           type="button"
           size="sm"
           onClick={handleSavePhoneAndPreferences}
-          disabled={saveStatus === "loading"}
+          disabled={saveStatus === "loading" || otpStep !== "idle"}
           aria-busy={saveStatus === "loading"}
         >
           {saveStatus === "loading" ? "Ukladám…" : "Uložiť číslo a nastavenia"}

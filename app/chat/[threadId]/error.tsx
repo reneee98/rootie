@@ -5,19 +5,18 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 
 export default function ChatThreadError({
-  error,
-  reset,
+  retry,
 }: {
   error: Error;
-  reset: () => void;
+  retry: () => void;
 }) {
   return (
     <div className="mx-auto flex min-h-[60vh] max-w-md flex-col items-center justify-center gap-3 px-4 text-center">
       <div className="rootie-surface w-full space-y-3 p-5">
         <h1 className="text-lg font-semibold">Nepodarilo sa načítať konverzáciu</h1>
-        <p className="text-sm text-muted-foreground">{error.message || "Skúste to prosím znova."}</p>
+        <p className="text-sm text-muted-foreground">Skúste načítanie zopakovať.</p>
         <div className="flex w-full gap-2">
-          <Button type="button" className="flex-1" onClick={reset}>
+          <Button type="button" className="flex-1" onClick={retry}>
             Skúsiť znova
           </Button>
           <Button asChild type="button" variant="outline" className="flex-1">

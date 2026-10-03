@@ -36,7 +36,11 @@ export async function getProfileByUserId(
     .eq("id", userId)
     .single();
 
-  if (error || !data) {
+  if (error && error.code !== "PGRST116") {
+    console.error("getProfileByUserId:", error);
+    throw new Error("Profil sa nepodarilo načítať.");
+  }
+  if (!data) {
     return null;
   }
 
@@ -49,9 +53,9 @@ export async function getProfileByUserId(
     district: data.district ?? null,
     phone_verified: Boolean(data.phone_verified),
     ratings_avg: data.ratings_avg != null ? Number(data.ratings_avg) : null,
-    ratings_count: Number(data.ratings_count) ?? 0,
-    active_listings_count: Number(data.active_listings_count) ?? 0,
-    sold_count: Number(data.sold_count) ?? 0,
+    ratings_count: Number(data.ratings_count ?? 0),
+    active_listings_count: Number(data.active_listings_count ?? 0),
+    sold_count: Number(data.sold_count ?? 0),
   };
 }
 
@@ -67,7 +71,11 @@ export async function getActiveListingsBySeller(
     .or(`auction_ends_at.is.null,auction_ends_at.gt.${new Date().toISOString()}`)
     .order("created_at", { ascending: false });
 
-  if (listingsError || !listings?.length) {
+  if (listingsError) {
+    console.error("getActiveListingsBySeller:", listingsError);
+    throw new Error("Inzeráty predajcu sa nepodarilo načítať.");
+  }
+  if (!listings?.length) {
     return [];
   }
 

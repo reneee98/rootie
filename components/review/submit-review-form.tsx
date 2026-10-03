@@ -19,11 +19,15 @@ export function SubmitReviewForm({
   listingId,
   threadId,
 }: SubmitReviewFormProps) {
-  const [state, formAction] = useActionState<FormState, FormData>(
+  const [state, formAction, pending] = useActionState<FormState, FormData>(
     async (_prev, formData) => {
       const rating = Number(formData.get("rating"));
       const body = (formData.get("body") as string)?.trim() || null;
-      return submitReview(sellerId, listingId, threadId, rating, body);
+      try {
+        return await submitReview(sellerId, listingId, threadId, rating, body);
+      } catch {
+        return { ok: false, error: "Recenziu sa nepodarilo odoslať. Skúste to znova." };
+      }
     },
     null
   );
@@ -62,7 +66,7 @@ export function SubmitReviewForm({
         />
       </div>
       {state?.ok === false && (
-        <p className="text-destructive text-sm">{state.error}</p>
+        <p className="text-destructive text-sm" role="alert">{state.error}</p>
       )}
       {state?.ok === true && (
         <p className="text-emerald-600 text-sm">
@@ -73,8 +77,8 @@ export function SubmitReviewForm({
         </p>
       )}
       <div className="flex gap-2">
-        <Button type="submit" disabled={state?.ok === true}>
-          Odoslať recenziu
+        <Button type="submit" disabled={pending || state?.ok === true}>
+          {pending ? "Odosielam…" : "Odoslať recenziu"}
         </Button>
         <Button asChild variant="outline" type="button">
           <Link href="/inbox">Zrušiť</Link>

@@ -3,5 +3,5 @@ export function isNonEmptyString(value: string) {
 }
 
 export function isUuidLike(value: string) {
-  return /^[0-9a-fA-F-]{8,}$/.test(value);
+  return typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }

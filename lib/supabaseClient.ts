@@ -117,5 +117,6 @@ export async function createSupabaseMiddlewareClient(
     },
   });
 
-  return { supabase, response };
+  // Authentication can refresh cookies after this helper returns.
+  return { supabase, getResponse: () => response };
 }

@@ -8,13 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AuthScreenLayout } from "@/components/auth/auth-screen-layout";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { normalizeNextPath } from "@/lib/auth-redirect";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function normalizeNextPath(nextPath?: string) {
-  if (!nextPath || !nextPath.startsWith("/")) return "/";
-  return nextPath;
-}
 
 type SignupScreenProps = {
   nextPath?: string;
@@ -32,7 +28,7 @@ export function SignupScreen({ nextPath }: SignupScreenProps) {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const nameTrimmed = name.trim();
-  const nameValid = nameTrimmed.length >= 2;
+  const nameValid = nameTrimmed.length >= 2 && nameTrimmed.length <= 80;
   const nameTouched = name.length > 0;
   const nameError = nameTouched && !nameTrimmed ? "Zadajte meno." : nameTouched && !nameValid ? "Meno musí mať aspoň 2 znaky." : null;
 
@@ -52,36 +48,35 @@ export function SignupScreen({ nextPath }: SignupScreenProps) {
     setError(null);
     setMessage(null);
 
-    const supabase = createSupabaseBrowserClient();
-    const appOrigin =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : (process.env.NEXT_PUBLIC_APP_URL ?? "");
-    const emailRedirectTo = appOrigin ? `${appOrigin}/auth/callback` : undefined;
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const emailRedirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(redirectPath)}`;
+      const { data, error: signUpError } = await supabase.auth.signUp({
+        email: emailTrimmed.toLowerCase(),
+        password,
+        options: {
+          data: { full_name: nameTrimmed },
+          emailRedirectTo,
+        },
+      });
 
-    const { data, error: signUpError } = await supabase.auth.signUp({
-      email: emailTrimmed.toLowerCase(),
-      password,
-      options: {
-        data: { full_name: nameTrimmed },
-        ...(emailRedirectTo && { emailRedirectTo }),
-      },
-    });
+      if (signUpError) {
+        setError(signUpError.message);
+        return;
+      }
 
-    if (signUpError) {
-      setError(signUpError.message);
+      if (data.session) {
+        router.replace(redirectPath);
+        router.refresh();
+        return;
+      }
+
+      setMessage("Účet bol vytvorený. Skontrolujte e-mail pre potvrdenie.");
+    } catch {
+      setError("Registrácia sa nepodarila. Skontrolujte pripojenie a skúste to znova.");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    if (data.session) {
-      router.replace(redirectPath);
-      router.refresh();
-      return;
-    }
-
-    setMessage("Účet bol vytvorený. Skontrolujte e-mail pre potvrdenie.");
-    setIsSubmitting(false);
   };
 
   return (
@@ -116,6 +111,8 @@ export function SignupScreen({ nextPath }: SignupScreenProps) {
                 className="h-12 text-base"
                 aria-invalid={!!nameError}
                 aria-describedby={nameError ? "signup-name-error" : undefined}
+                maxLength={80}
+                required
               />
               {nameError && (
                 <p id="signup-name-error" className="text-destructive text-sm" role="alert">
@@ -138,6 +135,7 @@ export function SignupScreen({ nextPath }: SignupScreenProps) {
                 className="h-12 text-base"
                 aria-invalid={!!emailError}
                 aria-describedby={emailError ? "signup-email-error" : undefined}
+                required
               />
               {emailError && (
                 <p id="signup-email-error" className="text-destructive text-sm" role="alert">
@@ -160,6 +158,8 @@ export function SignupScreen({ nextPath }: SignupScreenProps) {
                 className="h-12 text-base"
                 aria-invalid={!!passwordError}
                 aria-describedby={passwordError ? "signup-password-error" : undefined}
+                minLength={6}
+                required
               />
               {passwordError && (
                 <p id="signup-password-error" className="text-destructive text-sm" role="alert">

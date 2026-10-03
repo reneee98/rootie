@@ -61,7 +61,7 @@ export async function getWantedFeed(
   filters: WantedFeedFilters
 ): Promise<{ items: WantedFeedCard[]; hasMore: boolean }> {
   const supabase = await createSupabaseServerClient();
-  const page = filters.page ?? 1;
+  const page = Number.isSafeInteger(filters.page) && (filters.page ?? 0) > 0 ? filters.page! : 1;
   const from = (page - 1) * PAGE_SIZE;
   const to = from + PAGE_SIZE;
 
@@ -93,7 +93,7 @@ export async function getWantedFeed(
     return { items: [], hasMore: false };
   }
 
-  const items: WantedFeedCard[] = rows.map((r: Record<string, unknown>) => {
+  const items: WantedFeedCard[] = rows.slice(0, PAGE_SIZE).map((r: Record<string, unknown>) => {
     const user = r.user as Record<string, unknown> | null;
     return {
       id: r.id as string,
@@ -113,7 +113,7 @@ export async function getWantedFeed(
     };
   });
 
-  return { items, hasMore: rows.length === PAGE_SIZE };
+  return { items, hasMore: rows.length > PAGE_SIZE };
 }
 
 // ---------------------------------------------------------------------------

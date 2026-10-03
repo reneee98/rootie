@@ -89,21 +89,25 @@ export function ChatDealAndReview({
   const handleSendAddress = () => {
     setError(null);
     startTransition(async () => {
-      const result = await sendOrderShippingAddress(thread.id, {
-        name: addressName,
-        street: addressStreet,
-        city: addressCity,
-        zip: addressZip,
-        country: addressCountry,
-        phone: addressPhone || null,
-        saveAsDefault,
-      });
+      try {
+        const result = await sendOrderShippingAddress(thread.id, {
+          name: addressName,
+          street: addressStreet,
+          city: addressCity,
+          zip: addressZip,
+          country: addressCountry,
+          phone: addressPhone || null,
+          saveAsDefault,
+        });
 
-      if (result.ok) {
-        setAddressDialogOpen(false);
-        router.refresh();
-      } else {
-        setError(result.error);
+        if (result.ok) {
+          setAddressDialogOpen(false);
+          router.refresh();
+        } else {
+          setError(result.error);
+        }
+      } catch {
+        setError("Adresu sa nepodarilo odoslať. Skúste to znova.");
       }
     });
   };
@@ -111,11 +115,15 @@ export function ChatDealAndReview({
   const handleMarkShipped = () => {
     setError(null);
     startTransition(async () => {
-      const result = await markOrderShipped(thread.id);
-      if (result.ok) {
-        router.refresh();
-      } else {
-        setError(result.error);
+      try {
+        const result = await markOrderShipped(thread.id);
+        if (result.ok) {
+          router.refresh();
+        } else {
+          setError(result.error);
+        }
+      } catch {
+        setError("Odoslanie sa nepodarilo potvrdiť. Skúste to znova.");
       }
     });
   };
@@ -123,11 +131,15 @@ export function ChatDealAndReview({
   const handleMarkDelivered = () => {
     setError(null);
     startTransition(async () => {
-      const result = await markOrderDelivered(thread.id);
-      if (result.ok) {
-        router.refresh();
-      } else {
-        setError(result.error);
+      try {
+        const result = await markOrderDelivered(thread.id);
+        if (result.ok) {
+          router.refresh();
+        } else {
+          setError(result.error);
+        }
+      } catch {
+        setError("Doručenie sa nepodarilo potvrdiť. Skúste to znova.");
       }
     });
   };
@@ -135,11 +147,15 @@ export function ChatDealAndReview({
   const handleConfirmDeal = () => {
     setError(null);
     startTransition(async () => {
-      const result = await confirmDeal(thread.id);
-      if (result.ok) {
-        router.refresh();
-      } else {
-        setError(result.error);
+      try {
+        const result = await confirmDeal(thread.id);
+        if (result.ok) {
+          router.refresh();
+        } else {
+          setError(result.error);
+        }
+      } catch {
+        setError("Dohodu sa nepodarilo potvrdiť. Skúste to znova.");
       }
     });
   };
@@ -158,21 +174,21 @@ export function ChatDealAndReview({
 
     return (
       <>
-        <div className="space-y-2 border-t-2 border-emerald-300 bg-emerald-50/70 px-3 py-2 shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
+        <div className="space-y-2 border-t border-[#d7e6cc] bg-[#edf5e7] px-3 py-2 shadow-[0_-2px_10px_rgba(0,0,0,0.04)]">
           <div className="flex flex-wrap items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 text-sm text-muted-foreground">
+            <span className="inline-flex items-center gap-1.5 text-sm text-[#4f5d41]">
               <PackageCheck className="size-4 text-emerald-600" aria-hidden />
               Stav objednávky
             </span>
             {acceptedPriceLabel ? (
-              <span className="rounded-full bg-background px-2 py-0.5 text-xs font-medium text-foreground">
+              <span className="rounded-full border border-[#d7e6cc] bg-[#faf8f4] px-2 py-0.5 text-xs font-medium text-[#232711]">
                 {acceptedPriceLabel}
               </span>
             ) : null}
           </div>
 
           {!isSeller && orderState.status === "price_accepted" && (
-            <div className="space-y-2 rounded-lg border border-emerald-300 bg-background px-3 py-2">
+            <div className="space-y-2 rounded-lg border border-emerald-300 bg-[#faf8f4] px-3 py-2">
               <p className="text-sm font-medium">
                 Objednávka bude odoslaná. Pošlite predávajúcemu adresu, aby vám mohol zaslať balík.
               </p>
@@ -260,10 +276,10 @@ export function ChatDealAndReview({
             </div>
           )}
 
-          {error && <p className="w-full text-xs text-destructive">{error}</p>}
+          {error && <p role="alert" className="w-full text-sm text-destructive">{error}</p>}
         </div>
 
-        <Dialog open={addressDialogOpen} onOpenChange={setAddressDialogOpen}>
+        <Dialog open={addressDialogOpen} onOpenChange={(open) => { if (!pending) setAddressDialogOpen(open); }}>
           <DialogContent>
             <DialogHeader>
               <DialogTitle>Poslať adresu</DialogTitle>
@@ -359,6 +375,8 @@ export function ChatDealAndReview({
               </label>
             </div>
 
+            {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+
             <DialogFooter>
               <Button
                 type="button"
@@ -395,7 +413,7 @@ export function ChatDealAndReview({
   const iConfirmed = dealState.iConfirmed ?? false;
 
   return (
-    <div className="space-y-2 border-t bg-muted/20 px-3 py-2">
+    <div className="space-y-2 border-t border-[#e9e2d1] bg-[#f4efe3] px-3 py-2">
       {!dealConfirmed ? (
         <>
           <Button
@@ -422,7 +440,7 @@ export function ChatDealAndReview({
         </span>
       )}
 
-      {error && <p className="w-full text-xs text-destructive">{error}</p>}
+      {error && <p role="alert" className="w-full text-sm text-destructive">{error}</p>}
     </div>
   );
 }

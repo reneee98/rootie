@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { Heart } from "lucide-react";
 
 import { toggleSave } from "@/lib/actions/reactions-saves";
@@ -26,6 +27,7 @@ export function SaveListingButton({
   showCount = false,
   className,
 }: SaveListingButtonProps) {
+  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [saved, setSaved] = useState(isSaved);
   const [saveCount, setSaveCount] = useState(initialSaveCount);
@@ -46,27 +48,29 @@ export function SaveListingButton({
   }, [toastMessage]);
 
   const handleClick = () => {
-    if (!isAuthenticated || isPending) return;
-    startTransition(() => {
-      toggleSave(listingId)
-        .then((result) => {
-          if (!result.ok) return;
+    if (!isAuthenticated) {
+      router.push(`/login?next=${encodeURIComponent(`/listing/${listingId}`)}`);
+      return;
+    }
+    if (isPending) return;
+    startTransition(async () => {
+      try {
+          const result = await toggleSave(listingId);
+          if (!result.ok) {
+            setToastMessage(result.error);
+            return;
+          }
           setSaved(result.is_saved);
           setSaveCount(result.save_count);
-          setToastMessage(result.is_saved ? "Uložené ✅" : "Odložené z uložených");
+          setToastMessage(result.is_saved ? "Uložené" : "Odstránené z uložených");
           if (typeof window !== "undefined") {
             window.dispatchEvent(new Event("rootie:saved-changed"));
           }
-        })
-        .catch(() => {
-          // No-op: fallback to server data on next refresh.
-        });
+      } catch {
+        setToastMessage("Zmenu sa nepodarilo uložiť. Skúste to znova.");
+      }
     });
   };
-
-  if (!isAuthenticated && variant === "icon") {
-    return null;
-  }
 
   const label = saved ? "Uložené" : "Uložiť";
   const ariaLabel = showCount ? `${label}, uložené ${saveCount}` : label;
@@ -77,7 +81,7 @@ export function SaveListingButton({
         type="button"
         variant={variant === "icon" ? "outline" : "secondary"}
         size={variant === "icon" && showCount ? "sm" : variant === "icon" ? "icon" : "sm"}
-        disabled={!isAuthenticated || isPending}
+        disabled={isPending}
         onClick={handleClick}
         className={cn(className)}
         aria-label={ariaLabel}
@@ -99,7 +103,7 @@ export function SaveListingButton({
 
       {toastMessage ? (
         <div className="pointer-events-none fixed inset-x-0 bottom-[calc(6rem+env(safe-area-inset-bottom))] z-[80] flex justify-center px-4">
-          <div className="border-primary/20 bg-background/95 text-foreground rounded-full border px-3 py-1.5 text-xs font-medium shadow backdrop-blur">
+          <div role="status" className="border-primary/20 bg-background/95 text-foreground rounded-full border px-3 py-1.5 text-xs font-medium shadow backdrop-blur">
             {toastMessage}
           </div>
         </div>

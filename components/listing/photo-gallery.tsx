@@ -84,7 +84,7 @@ export function PhotoGallery({
   }
 
   return (
-    <div className="relative overflow-hidden" style={{ touchAction: "pan-x" }}>
+    <div className="relative overflow-hidden">
       {/* Swipeable strip */}
       <div
         ref={scrollRef}
@@ -93,7 +93,7 @@ export function PhotoGallery({
         style={{
           scrollSnapType: "x mandatory",
           WebkitOverflowScrolling: "touch",
-          touchAction: "pan-x",
+          touchAction: "pan-x pan-y",
         }}
         role="region"
         aria-label="Galéria fotiek"
@@ -127,6 +127,7 @@ export function PhotoGallery({
                   "select-none object-cover transition-opacity duration-200",
                   loaded[i] ? "opacity-100" : "opacity-0"
                 )}
+                sizes="(max-width: 768px) 100vw, 448px"
                 loading={i === 0 ? "eager" : "lazy"}
                 onLoad={(event) => {
                   const image = event.currentTarget;
@@ -149,13 +150,13 @@ export function PhotoGallery({
 
       {/* Dots indicator */}
       {photos.length > 1 && (
-        <div className="absolute bottom-3 left-1/2 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/20 px-2 py-1 backdrop-blur-sm">
+        <div className="absolute bottom-3 left-1/2 flex max-w-[calc(100%-1rem)] -translate-x-1/2 items-center gap-0 overflow-x-auto rounded-full bg-black/20 px-1 py-1 backdrop-blur-sm">
           {photos.map((p, i) => (
             <button
               key={p.id}
               type="button"
               onClick={() => goToSlide(i)}
-              className="flex size-4 items-center justify-center rounded-full"
+              className="flex size-11 shrink-0 items-center justify-center rounded-full"
               aria-label={`Fotka ${i + 1}`}
               aria-current={i === current ? "true" : undefined}
             >

@@ -46,6 +46,8 @@ export function ProfileInfoSection({
           defaultValue={initialDisplayName ?? ""}
           placeholder="Napr. Jana Kvetinárka"
           maxLength={80}
+          minLength={2}
+          required
         />
       </div>
 
@@ -65,10 +67,10 @@ export function ProfileInfoSection({
       </div>
 
       {state?.ok === false && (
-        <p className="text-destructive text-sm">{state.error}</p>
+        <p className="text-destructive text-sm" role="alert">{state.error}</p>
       )}
       {state?.ok === true && (
-        <p className="text-sm text-emerald-600">Profil bol uložený.</p>
+        <p className="text-sm text-emerald-600" role="status">Profil bol uložený.</p>
       )}
 
       <Button type="submit" disabled={isPending} className="w-full">

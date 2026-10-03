@@ -3,6 +3,7 @@
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { requireUser } from "@/lib/auth";
 import { SLOVAK_REGIONS } from "@/lib/regions";
+import { parseEuroAmountStrict } from "@/lib/money-validation";
 
 export type CreateWantedInput = {
   plantName: string;
@@ -26,8 +27,14 @@ export async function createWanted(
   const user = await requireUser("/wanted/create");
   const supabase = await createSupabaseServerClient();
 
-  if (!input.plantName.trim()) {
+  if (!input || typeof input.plantName !== "string" || !input.plantName.trim() || input.plantName.length > 200) {
     return { ok: false, error: "Názov rastliny je povinný." };
+  }
+
+  if (!["buy", "swap", "both"].includes(input.intent) || typeof input.negotiable !== "boolean" ||
+      typeof input.budgetMin !== "string" || typeof input.budgetMax !== "string" ||
+      typeof input.district !== "string" || typeof input.notes !== "string" || input.notes.length > 5000) {
+    return { ok: false, error: "Neplatné údaje požiadavky." };
   }
 
   if (
@@ -40,14 +47,11 @@ export async function createWanted(
   let budgetMin: number | null = null;
   let budgetMax: number | null = null;
   if (!input.negotiable) {
-    const min = input.budgetMin.trim()
-      ? parseFloat(input.budgetMin.replace(",", "."))
-      : NaN;
-    const max = input.budgetMax.trim()
-      ? parseFloat(input.budgetMax.replace(",", "."))
-      : NaN;
-    if (!isNaN(min) && min >= 0) budgetMin = min;
-    if (!isNaN(max) && max >= 0) budgetMax = max;
+    budgetMin = input.budgetMin.trim() ? parseEuroAmountStrict(input.budgetMin) : null;
+    budgetMax = input.budgetMax.trim() ? parseEuroAmountStrict(input.budgetMax) : null;
+    if ((input.budgetMin.trim() && budgetMin == null) || (input.budgetMax.trim() && budgetMax == null)) {
+      return { ok: false, error: "Zadajte platný rozpočet s najviac dvoma desatinnými miestami." };
+    }
     if (budgetMin != null && budgetMax != null && budgetMin > budgetMax) {
       return { ok: false, error: "Minimálny rozpočet nemôže byť vyšší ako maximálny." };
     }

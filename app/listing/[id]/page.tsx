@@ -13,6 +13,8 @@ import { ListingReportButton } from "@/components/listing/listing-report-button"
 import { ListingSellerBlock } from "@/components/listing/listing-seller-block";
 import { SafetyTipBox } from "@/components/listing/safety-tip-box";
 import { ListingCtaBar } from "@/components/listing/listing-cta-bar";
+import { ListingReactionsBar } from "@/components/listing/listing-reactions-bar";
+import { ListingSwapSection } from "@/components/listing/listing-swap-section";
 import { getListingDetail } from "@/lib/data/listings";
 import { getUser } from "@/lib/auth";
 import { formatPrice } from "@/lib/formatters";
@@ -46,13 +48,16 @@ export default async function ListingPage({ params }: ListingPageProps) {
       .eq("listing_id", listing.id)
       .order("amount", { ascending: false })
       .order("created_at", { ascending: true })
+      .order("id", { ascending: true })
       .limit(1)
       .maybeSingle();
 
-    isAuctionWinner = listing.status === "sold" && topBid?.bidder_id === currentUser.id;
+    isAuctionWinner = (listing.status === "reserved" || listing.status === "sold") && topBid?.bidder_id === currentUser.id;
   }
 
-  const auctionEnded = !isFixed && listing.status === "expired";
+  // This async server page evaluates availability at the time of the request.
+  // eslint-disable-next-line react-hooks/purity
+  const auctionEnded = !isFixed && (listing.status === "expired" || !listing.auction_ends_at || new Date(listing.auction_ends_at).getTime() <= Date.now());
   const locationLabel = listing.district
     ? `${getRegionShortLabel(listing.region)}, ${listing.district}`
     : getRegionShortLabel(listing.region);
@@ -73,6 +78,7 @@ export default async function ListingPage({ params }: ListingPageProps) {
     : "Neuvedené";
   const sizeLabel = listing.size ? getSizeLabel(listing.size) : "Neuvedené";
   const createdLabel = new Date(listing.created_at).toLocaleDateString("sk-SK", {
+    timeZone: "Europe/Bratislava",
     day: "numeric",
     month: "long",
     year: "numeric",
@@ -160,6 +166,23 @@ export default async function ListingPage({ params }: ListingPageProps) {
             <div className="mt-2.5">
               <ListingSellerBlock seller={listing.seller} />
             </div>
+          </section>
+
+          {listing.notes?.trim() ? (
+            <section className="mx-3 border-b border-[rgba(0,0,0,0.06)] px-[14px] pb-[12px] pt-[12px]">
+              <h2 className="text-[13px] font-semibold leading-[18px] text-[#232711]">Popis</h2>
+              <p className="mt-2 whitespace-pre-wrap text-[13px] leading-[18px] text-[#5a6e5a]">{listing.notes.trim()}</p>
+            </section>
+          ) : null}
+
+          {listing.swap_enabled ? (
+            <section className="mx-3 px-[14px] pb-[12px]">
+              <ListingSwapSection swapEnabled />
+            </section>
+          ) : null}
+
+          <section aria-label="Reakcie" className="mx-3 px-[14px] pb-[12px]">
+            <ListingReactionsBar listingId={listing.id} reactionCounts={listing.reaction_counts} myReaction={listing.my_reaction} isAuthenticated={isAuthenticated} />
           </section>
 
           <section className="mx-3 px-[14px] pb-[12px]">

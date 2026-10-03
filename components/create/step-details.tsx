@@ -1,5 +1,6 @@
 "use client";
 
+import { ChevronDown } from "lucide-react";
 import { SLOVAK_REGIONS } from "@/lib/regions";
 import type { StepProps } from "./wizard-shell";
 
@@ -22,18 +23,17 @@ const SIZES = [
   { value: "xl", label: "XL (nad 100 cm)" },
 ] as const;
 
-const selectClasses =
-  "rootie-field h-12 text-base appearance-none";
+const selectClasses = "rootie-field h-12 appearance-none border-[#e9e2d1] bg-[#faf8f4] pr-10 text-base";
 
 const inputClasses =
-  "rootie-field h-12 text-base";
+  "rootie-field h-12 border-[#e9e2d1] bg-[#faf8f4] text-base";
 
 export function StepDetails({ draft, updateDraft, errors }: StepProps) {
   return (
     <div className="space-y-5">
       <div>
-        <h2 className="text-base font-semibold mb-1">Detaily</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="mb-1 text-base font-semibold text-[#232711]">Detaily</h2>
+        <p className="text-sm text-[#67635c]">
           Kraj je povinný. Ostatné polia sú voliteľné.
         </p>
       </div>
@@ -43,22 +43,23 @@ export function StepDetails({ draft, updateDraft, errors }: StepProps) {
         <label htmlFor="region" className="text-sm font-medium">
           Kraj <span className="text-destructive">*</span>
         </label>
-        <select
-          id="region"
-          value={draft.region}
-          onChange={(e) => updateDraft({ region: e.target.value })}
-          className={`${selectClasses} ${
-            errors.region ? "border-destructive" : "border-input"
-          }`}
-          aria-invalid={!!errors.region}
-        >
-          <option value="">Vyberte kraj</option>
-          {SLOVAK_REGIONS.map((r) => (
-            <option key={r} value={r}>
-              {r}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            id="region"
+            value={draft.region}
+            onChange={(e) => updateDraft({ region: e.target.value })}
+            className={`${selectClasses} ${errors.region ? "border-destructive" : "border-input"}`}
+            aria-invalid={!!errors.region}
+          >
+            <option value="">Vyberte kraj</option>
+            {SLOVAK_REGIONS.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#878379]" />
+        </div>
         {errors.region && (
           <p className="text-sm text-destructive">{errors.region}</p>
         )}
@@ -84,18 +85,21 @@ export function StepDetails({ draft, updateDraft, errors }: StepProps) {
         <label htmlFor="condition" className="text-sm font-medium">
           Stav rastliny
         </label>
-        <select
-          id="condition"
-          value={draft.condition}
-          onChange={(e) => updateDraft({ condition: e.target.value })}
-          className={`${selectClasses} border-input`}
-        >
-          {CONDITIONS.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            id="condition"
+            value={draft.condition}
+            onChange={(e) => updateDraft({ condition: e.target.value })}
+            className={`${selectClasses} border-input`}
+          >
+            {CONDITIONS.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#878379]" />
+        </div>
       </div>
 
       {/* Size */}
@@ -103,18 +107,21 @@ export function StepDetails({ draft, updateDraft, errors }: StepProps) {
         <label htmlFor="size" className="text-sm font-medium">
           Veľkosť
         </label>
-        <select
-          id="size"
-          value={draft.size}
-          onChange={(e) => updateDraft({ size: e.target.value })}
-          className={`${selectClasses} border-input`}
-        >
-          {SIZES.map((s) => (
-            <option key={s.value} value={s.value}>
-              {s.label}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            id="size"
+            value={draft.size}
+            onChange={(e) => updateDraft({ size: e.target.value })}
+            className={`${selectClasses} border-input`}
+          >
+            {SIZES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-[#878379]" />
+        </div>
       </div>
 
       {/* Notes */}

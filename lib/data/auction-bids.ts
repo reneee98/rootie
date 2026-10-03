@@ -175,9 +175,11 @@ export async function getBidderAuctionListings(
   // 3. Get ALL bids for these listings (to determine top bid and count)
   const { data: allBids } = await supabase
     .from("bids")
-    .select("listing_id, bidder_id, amount")
+    .select("id, listing_id, bidder_id, amount, created_at")
     .in("listing_id", activeListingIds)
-    .order("amount", { ascending: false });
+    .order("amount", { ascending: false })
+    .order("created_at", { ascending: true })
+    .order("id", { ascending: true });
 
   // 4. Get seller profiles
   const sellerIds = [...new Set(listings.map((l) => l.seller_id))];
@@ -219,7 +221,7 @@ export async function getBidderAuctionListings(
     const myHighestAmount = myHighest ? Number(myHighest.amount) : 0;
 
     // User is winning if their highest bid equals the top bid
-    const isWinning = myHighestAmount >= topBid && topBid > 0;
+    const isWinning = bidsForListing[0]?.bidder_id === bidderId;
 
     return {
       listing_id: l.id,
@@ -231,7 +233,7 @@ export async function getBidderAuctionListings(
       top_bid: topBid,
       total_bid_count: totalBidCount,
       my_highest_bid: myHighestAmount,
-      my_last_bid_at: userBidsForListing[0]?.created_at ?? "",
+      my_last_bid_at: userBidsForListing.reduce((latest, bid) => bid.created_at > latest ? bid.created_at : latest, ""),
       is_winning: isWinning,
     };
   }).sort((a, b) => {

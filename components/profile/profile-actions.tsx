@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useActionState, useCallback, useEffect, useState } from "react";
+import { useActionState, useCallback, useEffect, useRef, useState } from "react";
 
 import { Ban, MessageCircle, Flag, Star } from "lucide-react";
 
@@ -41,23 +41,32 @@ export function ProfileActions({
   const router = useRouter();
   const [blockPending, setBlockPending] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
-  const [reportState, reportFormAction] = useActionState<ReportFormState | null, FormData>(
+  const [blockError, setBlockError] = useState<string | null>(null);
+  const blockRef = useRef(false);
+  const [reportState, reportFormAction, reportPending] = useActionState<ReportFormState | null, FormData>(
     (prev, formData) => reportUserFormAction(prev, formData),
     null
   );
 
   const handleBlock = useCallback(async () => {
+    if (blockRef.current) return;
+    blockRef.current = true;
     setBlockPending(true);
-    const result = await blockUser(profileUserId);
-    setBlockPending(false);
-    if (result.ok) {
-      router.refresh();
+    setBlockError(null);
+    try {
+      const result = await blockUser(profileUserId);
+      if (result.ok) router.refresh();
+      else setBlockError(result.error);
+    } catch {
+      setBlockError("Používateľa sa nepodarilo zablokovať. Skúste to znova.");
+    } finally {
+      setBlockPending(false);
+      blockRef.current = false;
     }
   }, [profileUserId, router]);
 
   useEffect(() => {
     if (reportState?.ok === true) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       setReportOpen(false);
     }
   }, [reportState]);
@@ -108,6 +117,7 @@ export function ProfileActions({
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
       {messageButton}
+      {blockError && <p role="alert" className="text-sm text-destructive">{blockError}</p>}
 
       {reviewableCount > 0 && (
         <Button asChild variant="secondary" size="lg" className="gap-1.5">
@@ -132,7 +142,7 @@ export function ProfileActions({
           {blockPending ? "Blokujem\u2026" : "Zablokovať"}
         </Button>
 
-        <Dialog open={reportOpen} onOpenChange={setReportOpen}>
+        <Dialog open={reportOpen} onOpenChange={(open) => { if (!reportPending) setReportOpen(open); }}>
           <DialogTrigger asChild>
             <Button
               type="button"
@@ -170,7 +180,7 @@ export function ProfileActions({
                 {reasons.map((r) => (
                   <option key={r} value={r}>
                     {r === "spam" && "Spam"}
-                    {r === "harassment" && "Obtěžovanie"}
+                    {r === "harassment" && "Obťažovanie"}
                     {r === "scam" && "Podvod"}
                     {r === "inappropriate_content" && "Nevhodný obsah"}
                     {r === "other" && "Iné"}
@@ -183,12 +193,13 @@ export function ProfileActions({
               <textarea
                 id="report-details"
                 name="details"
-                placeholder="Popis problému\u2026"
+                placeholder="Popis problému…"
                 rows={3}
+                maxLength={2000}
                 className="rootie-textarea min-w-0 text-base md:text-sm"
               />
               {reportState?.ok === false && (
-                <p className="text-destructive text-sm">{reportState.error}</p>
+                <p role="alert" className="text-destructive text-sm">{reportState.error}</p>
               )}
               {reportState?.ok === true && (
                 <p className="text-emerald-600 text-sm">
@@ -197,8 +208,8 @@ export function ProfileActions({
               )}
             </form>
             <DialogFooter showCloseButton>
-              <Button type="submit" form="report-form">
-                Odoslať nahlásenie
+              <Button type="submit" form="report-form" disabled={reportPending}>
+                {reportPending ? "Odosielam…" : "Odoslať nahlásenie"}
               </Button>
             </DialogFooter>
           </DialogContent>

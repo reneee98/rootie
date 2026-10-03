@@ -45,6 +45,8 @@ export function ReportActions({
       } else {
         setError(result.error);
       }
+    } catch {
+      setError("Akciu sa nepodarilo vykonať. Skúste to znova.");
     } finally {
       setLoading(null);
     }

@@ -36,9 +36,9 @@ function withUpdatedParams(
 
 function readHistoryFromStorage() {
   if (typeof window === "undefined") return [] as string[];
-  const raw = window.localStorage.getItem(HISTORY_STORAGE_KEY);
-  if (!raw) return [] as string[];
   try {
+    const raw = window.localStorage.getItem(HISTORY_STORAGE_KEY);
+    if (!raw) return [] as string[];
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [] as string[];
     return parsed
@@ -53,12 +53,19 @@ export function FullSearchScreen() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const inputRef = useRef<HTMLInputElement | null>(null);
 
   const initialQuery = (searchParams.get("q") ?? "").trim();
   const [query, setQuery] = useState(initialQuery);
-  const [isSearching, setIsSearching] = useState(false);
+  const [isSearching, setIsSearching] = useState(initialQuery.length >= 2);
   const [results, setResults] = useState<PlantTaxonResult[]>([]);
-  const [history, setHistory] = useState<string[]>(readHistoryFromStorage);
+  const [history, setHistory] = useState<string[]>([]);
+
+  useEffect(() => {
+    // Browser storage is unavailable during server rendering.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    setHistory(readHistoryFromStorage());
+  }, []);
 
   const saveToHistory = useCallback((value: string) => {
     if (typeof window === "undefined") return;
@@ -67,19 +74,47 @@ export function FullSearchScreen() {
 
     setHistory((current) => {
       const next = [trimmed, ...current.filter((item) => normalize(item) !== normalize(trimmed))].slice(0, 8);
-      window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(next));
+      try {
+        window.localStorage.setItem(HISTORY_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        // Searching also works when browser storage is unavailable.
+      }
       return next;
     });
   }, []);
 
   const clearHistory = useCallback(() => {
     if (typeof window !== "undefined") {
-      window.localStorage.removeItem(HISTORY_STORAGE_KEY);
+      try {
+        window.localStorage.removeItem(HISTORY_STORAGE_KEY);
+      } catch {
+        // Keep the in-memory history usable.
+      }
     }
     setHistory([]);
   }, []);
 
   useEffect(() => {
+    const focusInput = () => {
+      const input = inputRef.current;
+      if (!input) return;
+      input.focus({ preventScroll: true });
+      const cursorPosition = input.value.length;
+      input.setSelectionRange(cursorPosition, cursorPosition);
+    };
+
+    focusInput();
+    const rafId = window.requestAnimationFrame(focusInput);
+    const timeoutId = window.setTimeout(focusInput, 180);
+
+    return () => {
+      window.cancelAnimationFrame(rafId);
+      window.clearTimeout(timeoutId);
+    };
+  }, []);
+
+  useEffect(() => {
+    let active = true;
     if (debounceRef.current) clearTimeout(debounceRef.current);
 
     const term = query.trim();
@@ -91,24 +126,26 @@ export function FullSearchScreen() {
       setIsSearching(true);
       searchPlantTaxa(term)
         .then((data) => {
-          setResults(data);
+          if (active) setResults(data);
+        })
+        .catch(() => {
+          if (active) setResults([]);
         })
         .finally(() => {
-          setIsSearching(false);
+          if (active) setIsSearching(false);
         });
     }, 260);
 
     return () => {
+      active = false;
       if (debounceRef.current) clearTimeout(debounceRef.current);
     };
   }, [query]);
 
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value);
-    if (value.trim().length < 2) {
-      setResults([]);
-      setIsSearching(false);
-    }
+    setResults([]);
+    setIsSearching(value.trim().length >= 2);
   }, []);
 
   const visibleTaxa = useMemo(() => {
@@ -132,10 +169,10 @@ export function FullSearchScreen() {
   const noMatches = query.trim().length >= 2 && !isSearching && visibleTaxa.length === 0;
 
   const closeSearch = useCallback(() => {
-    const nextParams = withUpdatedParams(searchParams, { q: query.trim() });
+    const nextParams = new URLSearchParams(searchParams.toString());
     const nextQs = nextParams.toString();
     router.push(nextQs ? `/?${nextQs}` : "/");
-  }, [query, router, searchParams]);
+  }, [router, searchParams]);
 
   const submitSearch = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
@@ -164,6 +201,7 @@ export function FullSearchScreen() {
           <form onSubmit={submitSearch} className="rootie-surface flex min-h-[44px] items-center rounded-[18px] px-3">
             <Search className="text-muted-foreground size-4 shrink-0" aria-hidden />
             <input
+              ref={inputRef}
               type="search"
               value={query}
               onChange={(event) => handleQueryChange(event.target.value)}
@@ -176,7 +214,7 @@ export function FullSearchScreen() {
             {query ? (
               <button
                 type="button"
-                className="text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-full"
+                className="text-muted-foreground hover:text-foreground inline-flex size-11 shrink-0 items-center justify-center rounded-full"
                 onClick={() => handleQueryChange("")}
                 aria-label="Vymazať hľadanie"
               >
@@ -188,14 +226,19 @@ export function FullSearchScreen() {
           <p className="text-muted-foreground text-xs">
             Vyber z návrhov a hľadanie bude presnejšie.
           </p>
+          {query.trim() ? (
+            <Button type="button" className="w-full" onClick={() => applySearchAndGoHome(query)}>
+              Hľadať inzeráty pre „{query.trim()}“
+            </Button>
+          ) : null}
         </header>
 
         <div className="mt-3 flex-1 space-y-4 overflow-y-auto pb-2">
           {noMatches ? (
             <section className="rootie-surface rounded-2xl p-4 text-center">
-              <h2 className="text-sm font-semibold">Nič sme nenašli pre „{query.trim()}“</h2>
+              <h2 className="text-sm font-semibold">Žiadny návrh pre „{query.trim()}“</h2>
               <p className="text-muted-foreground mt-1 text-xs">
-                Nechaj to na komunitu, pridaj Hľadám a ľudia sa ti ozvú.
+                Inzeráty môžeš hľadať aj pod vlastným názvom rastliny.
               </p>
               <div className="mt-3 space-y-2">
                 <Button asChild className="min-h-[44px] w-full">

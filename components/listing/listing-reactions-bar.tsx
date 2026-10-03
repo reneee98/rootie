@@ -41,15 +41,17 @@ export function ListingReactionsBar({
   const [optimisticReaction, setOptimisticReaction] = useState<ReactionType | null>(myReaction);
   const [optimisticCounts, setOptimisticCounts] = useState<ReactionCounts>(reactionCounts);
   const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState("");
 
-  const displayReaction = optimisticReaction ?? myReaction;
+  const displayReaction = optimisticReaction;
   const displayCounts = optimisticCounts;
 
   const totalCount = Object.values(displayCounts).reduce((a, b) => a + b, 0);
 
   const handleSelect = async (type: ReactionType) => {
-    if (!isAuthenticated) return;
+    if (!isAuthenticated || isPending) return;
     const previous = displayReaction;
+    const previousCounts = optimisticCounts;
     const isTogglingOff = previous === type;
 
     setOptimisticReaction(isTogglingOff ? null : type);
@@ -60,9 +62,23 @@ export function ListingReactionsBar({
       return next;
     });
     setIsPending(true);
-    await saveReaction(listingId, isTogglingOff ? null : type);
-    setIsPending(false);
-    setOpen(false);
+    setError("");
+    try {
+      const result = await saveReaction(listingId, isTogglingOff ? null : type);
+      if (!result.ok) {
+        setOptimisticReaction(previous);
+        setOptimisticCounts(previousCounts);
+        setError(result.error);
+        return;
+      }
+      setOpen(false);
+    } catch {
+      setOptimisticReaction(previous);
+      setOptimisticCounts(previousCounts);
+      setError("Reakciu sa nepodarilo uložiť. Skúste to znova.");
+    } finally {
+      setIsPending(false);
+    }
   };
 
   if (!isAuthenticated) {
@@ -153,6 +169,7 @@ export function ListingReactionsBar({
             </button>
           ))}
         </div>
+        {error ? <p role="alert" className="px-4 pb-4 text-sm text-destructive">{error}</p> : null}
       </DrawerContent>
     </Drawer>
   );

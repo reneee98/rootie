@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Euro, ArrowLeftRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { parseEuroAmountStrict } from "@/lib/money-validation";
 
 export type OfferFormSubmitResult =
   | { ok: true; threadId: string }
@@ -38,34 +39,36 @@ export function OfferForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    const num = parseEuroAmountStrict(amount);
+    const text = swapBody.trim();
     if (offerType === "price") {
-      const num = parseFloat(amount.replace(",", "."));
-      if (isNaN(num) || num <= 0) {
+      if (num == null || num <= 0) {
         setError("Zadajte platnú sumu.");
         return;
       }
-      setPending(true);
-      const result = await submitAction(contextId, "price", num);
-      setPending(false);
-      if (result.ok) {
-        router.push(`/chat/${result.threadId}`);
-        return;
-      }
-      setError(result.error);
     } else {
-      const text = swapBody.trim();
       if (!text) {
         setError("Popíšte, čo ponúkate na výmenu.");
         return;
       }
-      setPending(true);
-      const result = await submitAction(contextId, "swap", undefined, text);
-      setPending(false);
+    }
+    setPending(true);
+    try {
+      const result = await submitAction(
+        contextId,
+        offerType,
+        offerType === "price" && num != null ? num : undefined,
+        offerType === "swap" ? text : undefined
+      );
       if (result.ok) {
         router.push(`/chat/${result.threadId}`);
         return;
       }
       setError(result.error);
+    } catch {
+      setError("Ponuku sa nepodarilo odoslať. Skúste to znova.");
+    } finally {
+      setPending(false);
     }
   };
 
@@ -87,6 +90,7 @@ export function OfferForm({
                 name="offerType"
                 value="price"
                 checked={offerType === "price"}
+                disabled={pending}
                 onChange={() => setOfferType("price")}
                 className="size-4"
                 aria-label="Ponuka ceny"
@@ -100,6 +104,7 @@ export function OfferForm({
                 name="offerType"
                 value="swap"
                 checked={offerType === "swap"}
+                disabled={pending}
                 onChange={() => setOfferType("swap")}
                 className="size-4"
                 aria-label="Ponuka výmeny"

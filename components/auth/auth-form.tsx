@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { normalizeNextPath } from "@/lib/auth-redirect";
 
 type AuthMode = "login" | "signup";
 
@@ -17,14 +18,6 @@ type AuthFormProps = {
   mode: AuthMode;
   nextPath?: string;
 };
-
-function normalizeNextPath(nextPath?: string) {
-  if (!nextPath || !nextPath.startsWith("/")) {
-    return "/me";
-  }
-
-  return nextPath;
-}
 
 export function AuthForm({ mode, nextPath }: AuthFormProps) {
   const router = useRouter();

@@ -1,4 +1,5 @@
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
+import { isMessageTimestamp, messageCursorFilter } from "@/lib/message-cursor";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -164,7 +165,8 @@ export async function getMessages(
   threadId: string,
   userId: string,
   before?: string,
-  limit: number = MESSAGE_PAGE_SIZE
+  limit: number = MESSAGE_PAGE_SIZE,
+  beforeId?: string
 ): Promise<{ messages: ChatMessage[]; hasMore: boolean }> {
   const supabase = await createSupabaseServerClient();
 
@@ -173,10 +175,13 @@ export async function getMessages(
     .select("id, thread_id, sender_id, body, message_type, metadata, attachments, created_at")
     .eq("thread_id", threadId)
     .order("created_at", { ascending: false })
+    .order("id", { ascending: false })
     .limit(limit + 1);
 
   if (before) {
-    q = q.lt("created_at", before);
+    if (!isMessageTimestamp(before)) return { messages: [], hasMore: false };
+    q = beforeId ? q.or(messageCursorFilter("before", before, beforeId))
+      : q.lt("created_at", before);
   }
 
   const { data: rows, error } = await q;

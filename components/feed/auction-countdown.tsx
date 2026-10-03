@@ -14,7 +14,7 @@ export function AuctionCountdown({ endsAt, withPrefix = false }: AuctionCountdow
   useEffect(() => {
     const update = () => {
       const diff = new Date(endsAt).getTime() - Date.now();
-      if (diff <= 0) {
+      if (!Number.isFinite(diff) || diff <= 0) {
         setLabel("Skončila");
         return;
       }
@@ -43,7 +43,7 @@ export function AuctionCountdown({ endsAt, withPrefix = false }: AuctionCountdow
   return (
     <span className="inline-flex items-center gap-0.5 text-[10px] text-muted-foreground">
       <Clock className="size-2.5" aria-hidden />
-      {withPrefix ? `Končí za ${label}` : label}
+      {withPrefix && label !== "Skončila" ? `Končí za ${label}` : label}
     </span>
   );
 }

@@ -2,58 +2,57 @@
 
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
-
-function getParamsFromHash(hash: string): { access_token?: string; refresh_token?: string } {
-  const params = new URLSearchParams(hash.replace(/^#/, ""));
-  return {
-    access_token: params.get("access_token") ?? undefined,
-    refresh_token: params.get("refresh_token") ?? undefined,
-  };
-}
+import { normalizeNextPath } from "@/lib/auth-redirect";
 
 /**
- * Auth callback: Supabase po potvrdení e-mailu presmeruje sem s tokenmi v URL hash.
- * Parsujeme hash, zavoláme setSession a presmerujeme na domov.
+ * The browser client exchanges PKCE codes during initialization. Legacy hash
+ * links remain supported, and registration preserves the intended destination.
  */
 export default function AuthCallbackPage() {
   const router = useRouter();
   const [status, setStatus] = useState<"loading" | "ok" | "error">("loading");
 
   useEffect(() => {
+    let active = true;
     const run = async () => {
-      const hash = typeof window !== "undefined" ? window.location.hash : "";
-      const { access_token, refresh_token } = getParamsFromHash(hash);
-
-      if (access_token) {
+      const url = new URL(window.location.href);
+      const redirectPath = normalizeNextPath(url.searchParams.get("next"));
+      const hash = new URLSearchParams(url.hash.slice(1));
+      try {
         const supabase = createSupabaseBrowserClient();
-        const { error } = await supabase.auth.setSession({
-          access_token,
-          refresh_token: refresh_token ?? "",
-        });
-        if (!error) {
+        const { error: initializationError } = await supabase.auth.initialize();
+        const accessToken = hash.get("access_token");
+        const refreshToken = hash.get("refresh_token");
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+          if (error) throw error;
+        } else if (initializationError || url.searchParams.get("error") || hash.get("error")) {
+          throw new Error("Invalid confirmation link");
+        }
+
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (!active) return;
+        window.history.replaceState(null, "", window.location.pathname);
+        if (user && !error) {
           setStatus("ok");
-          window.history.replaceState(null, "", window.location.pathname);
-          router.replace("/");
+          router.replace(redirectPath);
           router.refresh();
           return;
         }
+        setStatus("error");
+      } catch {
+        if (!active) return;
+        window.history.replaceState(null, "", window.location.pathname);
+        setStatus("error");
       }
-
-      const supabase = createSupabaseBrowserClient();
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        setStatus("ok");
-        router.replace("/");
-        router.refresh();
-        return;
-      }
-
-      setStatus("error");
-      router.replace("/login");
-      router.refresh();
     };
-    run();
+    void run();
+    return () => { active = false; };
   }, [router]);
 
   return (
@@ -70,9 +69,14 @@ export default function AuthCallbackPage() {
           </p>
         )}
         {status === "error" && (
-          <p className="text-muted-foreground text-sm" role="status">
-            Presmerovávam na prihlásenie…
-          </p>
+          <div className="space-y-3">
+            <p className="text-destructive text-sm" role="alert">
+              Odkaz sa nepodarilo overiť. Môže byť neplatný alebo už použitý.
+            </p>
+            <Link href="/login" className="inline-flex min-h-11 items-center font-medium underline">
+              Prejsť na prihlásenie
+            </Link>
+          </div>
         )}
       </div>
     </div>

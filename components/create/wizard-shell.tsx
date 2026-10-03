@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useEffect, useCallback, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ChevronLeft, Sparkles } from "lucide-react";
 import { StepType } from "./step-type";
 import { StepPhotos } from "./step-photos";
 import { StepPlant } from "./step-plant";
@@ -10,35 +12,13 @@ import { StepPricing } from "./step-pricing";
 import { StepReview } from "./step-review";
 import { publishListing } from "@/lib/actions/create-listing";
 import type { CreateListingInput } from "@/lib/actions/create-listing";
+import { parseEuroAmountStrict } from "@/lib/money-validation";
+import { DEFAULT_DRAFT, TOTAL_STEPS, getDraftStorageKey, restoreDraft, validateStep, validateAll, type ListingDraft, type StepErrors } from "./listing-draft";
+export type { DraftPhoto, ListingDraft, StepErrors } from "./listing-draft";
 
 /* ------------------------------------------------------------------ */
 /* Types                                                               */
 /* ------------------------------------------------------------------ */
-
-export type DraftPhoto = {
-  url: string;
-  storagePath: string;
-};
-
-export type ListingDraft = {
-  type: "fixed" | "auction";
-  swapEnabled: boolean;
-  category: "plant" | "accessory";
-  photos: DraftPhoto[];
-  plantName: string;
-  plantTaxonId: string | null;
-  region: string;
-  district: string;
-  condition: string;
-  size: string;
-  notes: string;
-  fixedPrice: string;
-  auctionStartPrice: string;
-  auctionMinIncrement: string;
-  auctionDuration: "24h" | "48h" | "7d";
-};
-
-export type StepErrors = Record<string, string>;
 
 export type StepProps = {
   draft: ListingDraft;
@@ -51,7 +31,6 @@ export type StepProps = {
 /* ------------------------------------------------------------------ */
 
 const STORAGE_KEY = "rootie_listing_draft";
-const TOTAL_STEPS = 6;
 
 const STEP_LABELS = [
   "Typ inzerátu",
@@ -62,85 +41,9 @@ const STEP_LABELS = [
   "Zhrnutie",
 ];
 
-const DEFAULT_DRAFT: ListingDraft = {
-  type: "fixed",
-  swapEnabled: false,
-  category: "plant",
-  photos: [],
-  plantName: "",
-  plantTaxonId: null,
-  region: "",
-  district: "",
-  condition: "",
-  size: "",
-  notes: "",
-  fixedPrice: "",
-  auctionStartPrice: "",
-  auctionMinIncrement: "1",
-  auctionDuration: "24h",
-};
-
 /* ------------------------------------------------------------------ */
 /* Validation                                                          */
 /* ------------------------------------------------------------------ */
-
-function validateStep(step: number, draft: ListingDraft): StepErrors {
-  const errors: StepErrors = {};
-
-  switch (step) {
-    case 0:
-      break;
-
-    case 1:
-      if (draft.photos.length === 0) {
-        errors.photos = "Pridajte aspoň jednu fotku.";
-      }
-      break;
-
-    case 2:
-      if (!draft.plantName.trim()) {
-        errors.plantName = "Zadajte názov rastliny.";
-      }
-      break;
-
-    case 3:
-      if (!draft.region) {
-        errors.region = "Vyberte kraj.";
-      }
-      break;
-
-    case 4:
-      if (draft.type === "fixed") {
-        const price = parseFloat(draft.fixedPrice);
-        if (!draft.fixedPrice || isNaN(price) || price <= 0) {
-          errors.fixedPrice = "Zadajte platnú cenu.";
-        }
-      } else {
-        const start = parseFloat(draft.auctionStartPrice);
-        if (!draft.auctionStartPrice || isNaN(start) || start <= 0) {
-          errors.auctionStartPrice = "Zadajte platnú začiatočnú cenu.";
-        }
-        const incr = parseFloat(draft.auctionMinIncrement);
-        if (!draft.auctionMinIncrement || isNaN(incr) || incr <= 0) {
-          errors.auctionMinIncrement = "Zadajte platný minimálny príhoz.";
-        }
-      }
-      break;
-
-    default:
-      break;
-  }
-
-  return errors;
-}
-
-function validateAll(draft: ListingDraft): StepErrors {
-  let allErrors: StepErrors = {};
-  for (let i = 0; i < TOTAL_STEPS - 1; i++) {
-    allErrors = { ...allErrors, ...validateStep(i, draft) };
-  }
-  return allErrors;
-}
 
 /* ------------------------------------------------------------------ */
 /* Component                                                           */
@@ -159,17 +62,29 @@ export function WizardShell({ userId, defaultRegion }: Props) {
   const [isPublishing, startPublishing] = useTransition();
   const [publishError, setPublishError] = useState("");
   const [loaded, setLoaded] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const storageKey = getDraftStorageKey(userId);
 
   /* Load from localStorage on mount — setState inside effect is intentional (SSR constraint) */
   useEffect(() => {
     try {
-      const saved = localStorage.getItem(STORAGE_KEY);
+      const saved = localStorage.getItem(storageKey);
       if (saved) {
-        const parsed = JSON.parse(saved) as Partial<ListingDraft>;
         // eslint-disable-next-line react-hooks/set-state-in-effect
-        setDraft((prev) => ({ ...prev, ...parsed }));
-      } else if (defaultRegion) {
-        setDraft((prev) => ({ ...prev, region: defaultRegion }));
+        setDraft(restoreDraft(JSON.parse(saved), userId, defaultRegion));
+      } else {
+        const legacySaved = localStorage.getItem(STORAGE_KEY);
+        const legacyDraft = legacySaved ? restoreDraft(JSON.parse(legacySaved), userId, defaultRegion) : null;
+        // Migrate only drafts whose uploaded photos establish this account as the owner.
+        if (legacyDraft?.photos.length) {
+          try {
+            localStorage.setItem(storageKey, JSON.stringify(legacyDraft));
+            localStorage.removeItem(STORAGE_KEY);
+          } catch {
+            // Preserve the original draft if browser storage cannot save the migrated one.
+          }
+        }
+        setDraft(legacyDraft?.photos.length ? legacyDraft : { ...DEFAULT_DRAFT, region: defaultRegion });
       }
     } catch {
       if (defaultRegion) {
@@ -177,17 +92,17 @@ export function WizardShell({ userId, defaultRegion }: Props) {
       }
     }
     setLoaded(true);
-  }, [defaultRegion]);
+  }, [defaultRegion, storageKey, userId]);
 
   /* Autosave to localStorage */
   useEffect(() => {
     if (!loaded) return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(draft));
+      localStorage.setItem(storageKey, JSON.stringify(draft));
     } catch {
       /* localStorage full or unavailable — ignore */
     }
-  }, [draft, loaded]);
+  }, [draft, loaded, storageKey]);
 
   const updateDraft = useCallback((updates: Partial<ListingDraft>) => {
     setDraft((prev) => ({ ...prev, ...updates }));
@@ -203,6 +118,7 @@ export function WizardShell({ userId, defaultRegion }: Props) {
 
   /* Navigation */
   const handleNext = () => {
+    if (isUploading || isPublishing) return;
     const stepErrors = validateStep(step, draft);
     if (Object.keys(stepErrors).length > 0) {
       setErrors(stepErrors);
@@ -214,12 +130,14 @@ export function WizardShell({ userId, defaultRegion }: Props) {
   };
 
   const handleBack = () => {
+    if (isUploading || isPublishing) return;
     setErrors({});
     setStep((s) => Math.max(s - 1, 0));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleGoToStep = (target: number) => {
+    if (isPublishing) return;
     setErrors({});
     setStep(target);
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -227,6 +145,7 @@ export function WizardShell({ userId, defaultRegion }: Props) {
 
   /* Publish */
   const handlePublish = () => {
+    if (isPublishing || isUploading) return;
     const allErrors = validateAll(draft);
     if (Object.keys(allErrors).length > 0) {
       setErrors(allErrors);
@@ -236,65 +155,70 @@ export function WizardShell({ userId, defaultRegion }: Props) {
 
     setPublishError("");
     startPublishing(async () => {
-      let auctionEndsAt: string | null = null;
-      if (draft.type === "auction") {
-        const now = new Date();
-        const durationMs: Record<string, number> = {
-          "24h": 24 * 60 * 60 * 1000,
-          "48h": 48 * 60 * 60 * 1000,
-          "7d": 7 * 24 * 60 * 60 * 1000,
-        };
-        auctionEndsAt = new Date(
-          now.getTime() + (durationMs[draft.auctionDuration] ?? durationMs["24h"])
-        ).toISOString();
-      }
-
-      const input: CreateListingInput = {
-        type: draft.type,
-        swapEnabled: draft.swapEnabled,
-        category: draft.category,
-        plantName: draft.plantName,
-        plantTaxonId: draft.plantTaxonId,
-        condition: draft.condition,
-        size: draft.size,
-        notes: draft.notes,
-        region: draft.region,
-        district: draft.district,
-        fixedPrice:
-          draft.type === "fixed" ? parseFloat(draft.fixedPrice) : null,
-        auctionStartPrice:
-          draft.type === "auction"
-            ? parseFloat(draft.auctionStartPrice)
-            : null,
-        auctionMinIncrement:
-          draft.type === "auction"
-            ? parseFloat(draft.auctionMinIncrement)
-            : null,
-        auctionEndsAt,
-        photoUrls: draft.photos.map((p) => p.url),
-      };
-
-      const result = await publishListing(input);
-
-      if (!result.ok) {
-        setPublishError(result.error);
-        return;
-      }
-
-      /* Clear draft and redirect */
       try {
-        localStorage.removeItem(STORAGE_KEY);
+        let auctionEndsAt: string | null = null;
+        if (draft.type === "auction") {
+          const now = new Date();
+          const durationMs: Record<string, number> = {
+            "24h": 24 * 60 * 60 * 1000,
+            "48h": 48 * 60 * 60 * 1000,
+            "7d": 7 * 24 * 60 * 60 * 1000,
+          };
+          auctionEndsAt = new Date(
+            now.getTime() + (durationMs[draft.auctionDuration] ?? durationMs["24h"])
+          ).toISOString();
+        }
+
+        const input: CreateListingInput = {
+          type: draft.type,
+          swapEnabled: draft.swapEnabled,
+          category: draft.category,
+          plantName: draft.plantName,
+          plantTaxonId: draft.plantTaxonId,
+          condition: draft.condition,
+          size: draft.size,
+          notes: draft.notes,
+          region: draft.region,
+          district: draft.district,
+          fixedPrice:
+            draft.type === "fixed" ? parseEuroAmountStrict(draft.fixedPrice) : null,
+          auctionStartPrice:
+            draft.type === "auction"
+              ? parseEuroAmountStrict(draft.auctionStartPrice)
+              : null,
+          auctionMinIncrement:
+            draft.type === "auction"
+              ? parseEuroAmountStrict(draft.auctionMinIncrement)
+              : null,
+          auctionEndsAt,
+          photoUrls: draft.photos.map((p) => p.url),
+        };
+
+        const result = await publishListing(input);
+
+        if (!result.ok) {
+          setPublishError(result.error);
+          return;
+        }
+
+        /* Clear draft and redirect */
+        try {
+          localStorage.removeItem(storageKey);
+        } catch {
+          /* ignore */
+        }
+        router.push(`/listing/${result.listingId}`);
       } catch {
-        /* ignore */
+        setPublishError("Inzerát sa nepodarilo zverejniť. Skúste to znova.");
       }
-      router.push(`/listing/${result.listingId}`);
     });
   };
 
   /* Clear draft */
   const handleClearDraft = () => {
+    if (isUploading || isPublishing) return;
     try {
-      localStorage.removeItem(STORAGE_KEY);
+      localStorage.removeItem(storageKey);
     } catch {
       /* ignore */
     }
@@ -307,7 +231,7 @@ export function WizardShell({ userId, defaultRegion }: Props) {
   /* Loading state (avoid hydration mismatch with localStorage) */
   if (!loaded) {
     return (
-      <div className="flex items-center justify-center min-h-dvh">
+      <div className="rootie-surface flex min-h-[50dvh] items-center justify-center rounded-[18px] border-[#e9e2d1]">
         <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
       </div>
     );
@@ -327,6 +251,7 @@ export function WizardShell({ userId, defaultRegion }: Props) {
             updateDraft={updateDraft}
             errors={errors}
             userId={userId}
+            onUploadingChange={setIsUploading}
           />
         );
       case 2:
@@ -364,15 +289,21 @@ export function WizardShell({ userId, defaultRegion }: Props) {
   };
 
   return (
-    <div className="flex flex-col">
-      {/* ---- Progress header ---- */}
-      <div className="rootie-page-header pb-3">
-        <div className="mb-2 flex items-center justify-between">
-          <h1 className="text-lg font-semibold">Nový inzerát</h1>
+    <div className="rootie-page pb-0">
+      <header className="rootie-page-header space-y-3 border border-[#e9e2d1] bg-[#faf8f4] shadow-none">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#e9e2d1] bg-[#f2ede2] text-[#67635c] hover:bg-[#ece6d8] hover:text-[#232711]"
+            aria-label="Späť na domov"
+          >
+            <ChevronLeft className="size-5" aria-hidden />
+          </Link>
           {(draft.plantName || draft.photos.length > 0) && (
             <button
               onClick={handleClearDraft}
-              className="text-xs text-muted-foreground underline"
+              disabled={isUploading || isPublishing}
+              className="text-xs font-medium text-[#67635c] underline underline-offset-2"
               type="button"
             >
               Vymazať koncept
@@ -380,54 +311,65 @@ export function WizardShell({ userId, defaultRegion }: Props) {
           )}
         </div>
 
-        {/* Progress bar */}
+        <div className="space-y-1.5">
+          <p className="rootie-page-eyebrow flex items-center gap-1.5">
+            <Sparkles className="size-3.5 text-[#4f5826]" aria-hidden />
+            Pridať inzerát
+          </p>
+          <h1 className="rootie-page-title">Nový inzerát</h1>
+          <p className="rootie-page-description">
+            Krok {step + 1} z {TOTAL_STEPS} • {STEP_LABELS[step]}
+          </p>
+        </div>
+
         <div className="flex items-center gap-1.5">
           {Array.from({ length: TOTAL_STEPS }).map((_, i) => (
             <div
               key={i}
-              className={`h-1 flex-1 rounded-full transition-colors ${
-                i <= step ? "bg-primary" : "bg-muted"
+              className={`h-1.5 flex-1 rounded-full transition-colors ${
+                i <= step ? "bg-[#4f5826]" : "bg-[#e3dccd]"
               }`}
             />
           ))}
         </div>
-        <p className="text-xs text-muted-foreground mt-1">
-          Krok {step + 1} z {TOTAL_STEPS} &ndash; {STEP_LABELS[step]}
-        </p>
+      </header>
+
+      <div className="pb-28">
+        <section className="rootie-surface rounded-[18px] border-[#e9e2d1] p-4 shadow-none">
+          {renderStep()}
+        </section>
       </div>
 
-      {/* ---- Content ---- */}
-      <div className="flex-1 py-6 pb-24">{renderStep()}</div>
-
-      {/* ---- Fixed footer navigation ---- */}
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-[#e9e2d1] bg-background">
-        <div className="mx-auto max-w-md px-4 py-3 flex gap-3">
-          {step > 0 && (
+      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-[#e9e2d1] bg-transparent">
+        <div className="mx-auto flex w-full max-w-md gap-3 px-4 py-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))]">
+          {step > 0 ? (
             <button
               onClick={handleBack}
+              disabled={isUploading || isPublishing}
               type="button"
-              className={`h-12 rounded-[18px] border border-input bg-card px-4 text-sm font-medium shadow-[0_2px_6px_rgba(0,0,0,0.03)] ${
+              className={`h-12 rounded-[18px] border border-[#e9e2d1] bg-[#faf8f4] px-4 text-sm font-semibold text-[#232711] shadow-none ${
                 step === TOTAL_STEPS - 1 ? "w-auto px-6" : "flex-1"
               }`}
             >
               Späť
             </button>
-          )}
+          ) : null}
 
           {step < TOTAL_STEPS - 1 ? (
             <button
               onClick={handleNext}
+              disabled={isUploading || isPublishing}
               type="button"
-              className="h-12 flex-1 rounded-[18px] bg-primary text-sm font-medium text-primary-foreground shadow-[0_2px_6px_rgba(0,0,0,0.06)]"
+              className="h-12 flex-1 rounded-[18px] bg-[#4f5826] text-sm font-semibold text-[#faf8f4] shadow-[0_3px_10px_rgba(35,39,17,0.16)]"
             >
-              Ďalej
+              {isUploading ? "Nahrávam fotky…" : "Ďalej"}
             </button>
           ) : (
             <button
               onClick={handlePublish}
               disabled={isPublishing}
               type="button"
-              className="h-12 flex-1 rounded-[18px] bg-primary text-sm font-medium text-primary-foreground shadow-[0_2px_6px_rgba(0,0,0,0.06)] disabled:opacity-50"
+              className="h-12 flex-1 rounded-[18px] bg-[#4f5826] text-sm font-semibold text-[#faf8f4] shadow-[0_3px_10px_rgba(35,39,17,0.16)] disabled:opacity-50"
             >
               {isPublishing ? (
                 <span className="flex items-center justify-center gap-2">

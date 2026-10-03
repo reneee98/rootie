@@ -45,30 +45,40 @@ export function WantedCreateForm({ defaultRegion = "" }: WantedCreateFormProps) 
   const [showPlantDropdown, setShowPlantDropdown] = useState(false);
   const [isSearchingPlant, setIsSearchingPlant] = useState(false);
   const plantTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const plantSearchVersionRef = useRef(0);
   const plantContainerRef = useRef<HTMLDivElement>(null);
 
-  const handlePlantSearch = useCallback(async (term: string) => {
-    if (term.trim().length < 2) {
-      setPlantResults([]);
-      setShowPlantDropdown(false);
-      return;
+  const handlePlantSearch = useCallback(async (term: string, version: number) => {
+    try {
+      const data = await searchPlantTaxa(term);
+      if (version !== plantSearchVersionRef.current) return;
+      setPlantResults(data);
+      setShowPlantDropdown(data.length > 0);
+    } catch {
+      if (version === plantSearchVersionRef.current) setPlantResults([]);
+    } finally {
+      if (version === plantSearchVersionRef.current) setIsSearchingPlant(false);
     }
-    setIsSearchingPlant(true);
-    const data = await searchPlantTaxa(term);
-    setPlantResults(data);
-    setShowPlantDropdown(data.length > 0);
-    setIsSearchingPlant(false);
   }, []);
 
   const handlePlantInputChange = (value: string) => {
     setPlantQuery(value);
     setPlantName(value);
     setPlantTaxonId(null);
+    const version = ++plantSearchVersionRef.current;
+    setPlantResults([]);
+    setShowPlantDropdown(false);
+    setIsSearchingPlant(value.trim().length >= 2);
     if (plantTimeoutRef.current) clearTimeout(plantTimeoutRef.current);
-    plantTimeoutRef.current = setTimeout(() => handlePlantSearch(value), 300);
+    if (value.trim().length >= 2) {
+      plantTimeoutRef.current = setTimeout(() => handlePlantSearch(value, version), 300);
+    }
   };
 
   const handleSelectTaxon = (taxon: PlantTaxonResult) => {
+    plantSearchVersionRef.current += 1;
+    if (plantTimeoutRef.current) clearTimeout(plantTimeoutRef.current);
+    setIsSearchingPlant(false);
     setPlantQuery(taxon.canonical_name);
     setPlantName(taxon.canonical_name);
     setPlantTaxonId(taxon.id);
@@ -81,6 +91,9 @@ export function WantedCreateForm({ defaultRegion = "" }: WantedCreateFormProps) 
         plantContainerRef.current &&
         !plantContainerRef.current.contains(e.target as Node)
       ) {
+        plantSearchVersionRef.current += 1;
+        if (plantTimeoutRef.current) clearTimeout(plantTimeoutRef.current);
+        setIsSearchingPlant(false);
         setShowPlantDropdown(false);
       }
     };
@@ -90,30 +103,36 @@ export function WantedCreateForm({ defaultRegion = "" }: WantedCreateFormProps) 
 
   useEffect(() => {
     return () => {
+      plantSearchVersionRef.current += 1;
       if (plantTimeoutRef.current) clearTimeout(plantTimeoutRef.current);
     };
   }, []);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (isPending) return;
     setError("");
     startTransition(async () => {
-      const result = await createWanted({
-        plantName,
-        plantTaxonId,
-        region,
-        district,
-        budgetMin,
-        budgetMax,
-        negotiable,
-        intent,
-        notes,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        return;
+      try {
+        const result = await createWanted({
+            plantName,
+            plantTaxonId,
+            region,
+            district,
+            budgetMin,
+            budgetMax,
+            negotiable,
+            intent,
+            notes,
+        });
+        if (!result.ok) {
+          setError(result.error);
+          return;
+        }
+        router.push(`/wanted/${result.wantedId}`);
+      } catch {
+        setError("Požiadavku sa nepodarilo vytvoriť. Skúste to znova.");
       }
-      router.push(`/wanted/${result.wantedId}`);
     });
   };
 
@@ -240,7 +259,7 @@ export function WantedCreateForm({ defaultRegion = "" }: WantedCreateFormProps) 
                   type="number"
                   inputMode="decimal"
                   min={0}
-                  step={1}
+                  step="0.01"
                   value={budgetMin}
                   onChange={(e) => setBudgetMin(e.target.value)}
                   placeholder="0"
@@ -259,7 +278,7 @@ export function WantedCreateForm({ defaultRegion = "" }: WantedCreateFormProps) 
                   type="number"
                   inputMode="decimal"
                   min={0}
-                  step={1}
+                  step="0.01"
                   value={budgetMax}
                   onChange={(e) => setBudgetMax(e.target.value)}
                   placeholder="0"
@@ -310,7 +329,7 @@ export function WantedCreateForm({ defaultRegion = "" }: WantedCreateFormProps) 
       </div>
 
       {error && (
-        <p className="text-sm text-destructive">{error}</p>
+        <p role="alert" className="text-sm text-destructive">{error}</p>
       )}
 
       <Button

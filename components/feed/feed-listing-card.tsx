@@ -66,14 +66,13 @@ export function FeedListingCardComponent({
     listing.fixed_price != null ? formatPrice(listing.fixed_price) : "Dohodou";
 
   return (
-    <Link
-      href={`/listing/${listing.id}`}
+    <div
       className={cn(
-        "rootie-surface focus-visible:ring-ring flex flex-col overflow-hidden",
+        "rootie-surface relative flex flex-col overflow-hidden",
         "outline-none transition-all hover:-translate-y-0.5 hover:shadow-md focus-visible:ring-2 focus-visible:ring-offset-2"
       )}
-      aria-label={listing.plant_name}
     >
+      <Link href={`/listing/${listing.id}`} aria-label={listing.plant_name} className="absolute inset-0 z-10 rounded-[inherit] focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset" />
       <div className="relative aspect-[4/5] w-full overflow-hidden bg-muted">
         {listing.first_photo_url && !imgFailed ? (
           <>
@@ -126,23 +125,17 @@ export function FeedListingCardComponent({
           ) : null}
         </div>
 
-        {isAuthenticated ? (
-          <div
-            className="absolute right-2 bottom-2"
-            onClick={(event) => {
-              event.preventDefault();
-              event.stopPropagation();
-            }}
-          >
-            <SaveListingButton
-              listingId={listing.id}
-              isSaved={listing.is_saved ?? false}
-              isAuthenticated={isAuthenticated}
-              variant="icon"
-              className="size-11 rounded-full border-0 bg-background/90 shadow-sm backdrop-blur"
-            />
-          </div>
-        ) : null}
+        <div
+          className="absolute right-2 bottom-2 z-20"
+        >
+          <SaveListingButton
+            listingId={listing.id}
+            isSaved={listing.is_saved ?? false}
+            isAuthenticated={isAuthenticated}
+            variant="icon"
+            className="size-11 rounded-full border-0 bg-background/90 shadow-sm backdrop-blur"
+          />
+        </div>
       </div>
 
       <div className="space-y-2 p-3">
@@ -196,6 +189,6 @@ export function FeedListingCardComponent({
           ) : null}
         </div>
       </div>
-    </Link>
+    </div>
   );
 }

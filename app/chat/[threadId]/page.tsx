@@ -8,6 +8,7 @@ import {
   getHasBuyerReviewed,
 } from "@/lib/data/reviews";
 import { ChatRoom } from "@/components/chat/chat-room";
+import { isUuidLike } from "@/lib/validators";
 
 type ChatThreadPageProps = {
   params: Promise<{ threadId: string }>;
@@ -15,6 +16,7 @@ type ChatThreadPageProps = {
 
 export default async function ChatThreadPage({ params }: ChatThreadPageProps) {
   const { threadId } = await params;
+  if (!isUuidLike(threadId)) notFound();
   const user = await requireUser(`/chat/${threadId}`);
 
   const [thread, { messages, hasMore }, dealState, orderState] = await Promise.all([
@@ -36,6 +38,7 @@ export default async function ChatThreadPage({ params }: ChatThreadPageProps) {
     null;
   let listingSellerId: string | null = null;
   let listingType: "fixed" | "auction" | null = null;
+  let listingSwapEnabled = false;
   let hasBuyerReviewed: boolean | null = null;
   let buyerDefaultShippingAddress: Awaited<ReturnType<typeof getProfileShippingAddress>> | null =
     null;
@@ -46,10 +49,11 @@ export default async function ChatThreadPage({ params }: ChatThreadPageProps) {
     const supabase = await createSupabaseServerClient();
     const { data: listing } = await supabase
       .from("listings")
-      .select("seller_id, type, status")
+      .select("seller_id, type, status, swap_enabled")
       .eq("id", thread.listing_id)
       .single();
     listingSellerId = listing?.seller_id ?? null;
+    listingSwapEnabled = Boolean(listing?.swap_enabled);
     listingType =
       listing?.type === "fixed" || listing?.type === "auction"
         ? (listing.type as "fixed" | "auction")
@@ -114,6 +118,7 @@ export default async function ChatThreadPage({ params }: ChatThreadPageProps) {
 
   return (
     <ChatRoom
+      key={thread.id}
       thread={thread}
       initialMessages={messages}
       initialHasMore={hasMore}
@@ -124,6 +129,7 @@ export default async function ChatThreadPage({ params }: ChatThreadPageProps) {
       reviewEligibility={reviewEligibility ?? undefined}
       listingSellerId={listingSellerId ?? undefined}
       listingType={listingType ?? undefined}
+      listingSwapEnabled={listingSwapEnabled}
       canSendText={canSendText}
       sendTextBlockedReason={sendTextBlockedReason ?? undefined}
       hasBuyerReviewed={hasBuyerReviewed ?? undefined}

@@ -2,6 +2,7 @@
 
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { requireUser } from "@/lib/auth";
+import { validateBid } from "@/lib/bid-validation";
 
 export type PlaceBidResult =
   | { ok: true; bidId: string; amount: number }
@@ -47,12 +48,16 @@ export async function placeBid(
   }
 
   /* ---------- determine minimum bid ---------- */
-  const { data: topBidRows } = await supabase
+  const { data: topBidRows, error: topBidError } = await supabase
     .from("bids")
     .select("amount")
     .eq("listing_id", listingId)
     .order("amount", { ascending: false })
     .limit(1);
+
+  if (topBidError) {
+    return { ok: false, error: "Aktuálnu ponuku sa nepodarilo načítať. Skúste to znova." };
+  }
 
   const startPrice = Number(listing.auction_start_price);
   const minIncrement = Number(listing.auction_min_increment);
@@ -62,14 +67,9 @@ export async function placeBid(
 
   // First bid: must be >= start price.
   // Subsequent bids: must be >= current top bid + min increment.
-  const minBid =
-    topBidAmount != null ? topBidAmount + minIncrement : startPrice;
-
-  if (amount < minBid) {
-    return {
-      ok: false,
-      error: `Minimálna ponuka je ${minBid.toFixed(2)} €.`,
-    };
+  const validation = validateBid({ startPrice, minIncrement, topBidAmount, amount, auctionEndsAt: endsAt });
+  if (!validation.valid || !endsAt) {
+    return { ok: false, error: !validation.valid ? validation.error : "Aukcia nemá platný koniec." };
   }
 
   /* ---------- insert bid (RLS also enforces rules) ---------- */

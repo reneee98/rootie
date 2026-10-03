@@ -8,13 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { AuthScreenLayout } from "@/components/auth/auth-screen-layout";
 import { createSupabaseBrowserClient } from "@/lib/supabaseClient";
+import { normalizeNextPath } from "@/lib/auth-redirect";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function normalizeNextPath(nextPath?: string) {
-  if (!nextPath || !nextPath.startsWith("/")) return "/";
-  return nextPath;
-}
 
 type LoginScreenProps = {
   nextPath?: string;
@@ -44,20 +40,29 @@ export function LoginScreen({ nextPath }: LoginScreenProps) {
     setIsSubmitting(true);
     setError(null);
 
-    const supabase = createSupabaseBrowserClient();
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email: emailTrimmed.toLowerCase(),
-      password,
-    });
+    try {
+      const supabase = createSupabaseBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: emailTrimmed.toLowerCase(),
+        password,
+      });
 
-    if (signInError) {
-      setError(signInError.message);
+      if (signInError) {
+        setError(signInError.message === "Invalid login credentials"
+          ? "Nesprávny e-mail alebo heslo."
+          : signInError.message === "Email not confirmed"
+            ? "Najprv potvrďte svoj e-mail cez odkaz v správe."
+            : "Prihlásenie sa nepodarilo. Skúste to znova.");
+        return;
+      }
+
+      router.replace(redirectPath);
+      router.refresh();
+    } catch {
+      setError("Prihlásenie sa nepodarilo. Skontrolujte pripojenie a skúste to znova.");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-
-    router.replace(redirectPath);
-    router.refresh();
   };
 
   return (
@@ -92,6 +97,7 @@ export function LoginScreen({ nextPath }: LoginScreenProps) {
                 className="h-12 text-base"
                 aria-invalid={!!emailError}
                 aria-describedby={emailError ? "login-email-error" : undefined}
+                required
               />
               {emailError && (
                 <p id="login-email-error" className="text-destructive text-sm" role="alert">
@@ -105,12 +111,6 @@ export function LoginScreen({ nextPath }: LoginScreenProps) {
                 <label htmlFor="login-password" className="text-sm font-medium">
                   Heslo
                 </label>
-                <Link
-                  href="#"
-                  className="text-muted-foreground hover:text-foreground text-xs underline-offset-2 hover:underline"
-                >
-                  Zabudli ste heslo?
-                </Link>
               </div>
               <Input
                 id="login-password"
@@ -122,6 +122,7 @@ export function LoginScreen({ nextPath }: LoginScreenProps) {
                 className="h-12 text-base"
                 aria-invalid={!!passwordError}
                 aria-describedby={passwordError ? "login-password-error" : undefined}
+                required
               />
               {passwordError && (
                 <p id="login-password-error" className="text-destructive text-sm" role="alert">

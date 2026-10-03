@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createSupabaseServerClient } from "@/lib/supabaseClient";
 import { getUser } from "@/lib/auth";
+import { normalizePhone } from "@/lib/phone";
 
 export type UpdateProfileInfoResult =
   | { ok: true }
@@ -18,8 +19,17 @@ export async function updateProfileInfo(
     return { ok: false, error: "Nie ste prihlásený" };
   }
 
-  const trimmedName = displayName.trim().slice(0, 80);
-  const trimmedBio = bio.trim().slice(0, 500);
+  if (typeof displayName !== "string" || typeof bio !== "string") {
+    return { ok: false, error: "Neplatné údaje profilu." };
+  }
+  const trimmedName = displayName.trim();
+  const trimmedBio = bio.trim();
+  if (trimmedName.length < 2 || trimmedName.length > 80) {
+    return { ok: false, error: "Meno musí mať 2 až 80 znakov." };
+  }
+  if (trimmedBio.length > 500) {
+    return { ok: false, error: "Bio môže mať najviac 500 znakov." };
+  }
 
   const supabase = await createSupabaseServerClient();
   const { error } = await supabase
@@ -44,18 +54,6 @@ export type UpdatePhoneResult =
   | { ok: true }
   | { ok: false; error: string };
 
-/** E.164-ish: optional +, then digits (9–15). */
-const PHONE_REGEX = /^\+?[0-9]{9,15}$/;
-
-function normalizePhone(value: string): string {
-  const digits = value.replace(/\D/g, "");
-  if (digits.length < 9) return value;
-  if (value.startsWith("+")) return `+${digits}`;
-  if (digits.startsWith("421") && digits.length >= 12) return `+${digits}`;
-  if (digits.length >= 9 && digits.length <= 15) return `+${digits}`;
-  return value;
-}
-
 /**
  * Update current user's profile: phone (optional) and show_phone_on_listing.
  * Phone is stored but not verified by this action; use OTP flow for verification.
@@ -69,16 +67,23 @@ export async function updateProfilePhone(
     return { ok: false, error: "Nie ste prihlásený" };
   }
 
-  const normalized = phone?.trim() ? normalizePhone(phone.trim()) : null;
-  if (normalized !== null && !PHONE_REGEX.test(normalized)) {
+  if ((phone !== null && typeof phone !== "string") || typeof showPhoneOnListing !== "boolean") {
+    return { ok: false, error: "Neplatné nastavenia telefónu." };
+  }
+  const rawPhone = phone?.trim() || null;
+  const normalized = rawPhone ? normalizePhone(rawPhone) : null;
+  if (rawPhone && !normalized) {
     return { ok: false, error: "Zadajte platné číslo (napr. +421901234567)" };
   }
 
   const supabase = await createSupabaseServerClient();
+  const authPhone = user.phone ? normalizePhone(`+${user.phone.replace(/^\+/, "")}`) : null;
+  const phoneVerified = Boolean(normalized && authPhone === normalized && user.phone_confirmed_at);
   const { error } = await supabase
     .from("profiles")
     .update({
       phone: normalized,
+      phone_verified: phoneVerified,
       show_phone_on_listing: showPhoneOnListing,
       updated_at: new Date().toISOString(),
     })
@@ -104,18 +109,8 @@ export async function syncPhoneVerifiedFromAuth(): Promise<UpdatePhoneResult> {
     return { ok: false, error: "Nie ste prihlásený" };
   }
 
-  const phone = (user as { phone?: string | null }).phone ?? null;
-  const phoneVerified = Boolean((user as { phone_confirmed_at?: string | null }).phone_confirmed_at);
-
   const supabase = await createSupabaseServerClient();
-  const { error } = await supabase
-    .from("profiles")
-    .update({
-      phone: phone ?? undefined,
-      phone_verified: phoneVerified,
-      updated_at: new Date().toISOString(),
-    })
-    .eq("id", user.id);
+  const { error } = await supabase.rpc("sync_phone_verified_from_auth");
 
   if (error) {
     return { ok: false, error: error.message };
@@ -144,6 +139,10 @@ type ShippingAddressInput = {
 function normalizeShippingAddressInput(
   input: ShippingAddressInput
 ): ShippingAddressInput | null {
+  if (!input || [input.name, input.street, input.city, input.zip, input.country].some((value) => typeof value !== "string")) {
+    return null;
+  }
+  if (input.phone != null && typeof input.phone !== "string") return null;
   const name = input.name.trim();
   const street = input.street.trim();
   const city = input.city.trim();
@@ -151,7 +150,8 @@ function normalizeShippingAddressInput(
   const country = input.country.trim();
   const phone = input.phone?.trim() || null;
 
-  if (!name || !street || !city || !zip || !country) {
+  if (!name || !street || !city || !zip || !country ||
+    name.length > 120 || street.length > 200 || city.length > 100 || zip.length > 20 || country.length > 80 || (phone?.length ?? 0) > 40) {
     return null;
   }
 
@@ -200,5 +200,7 @@ export async function updateDefaultShippingAddress(
   }
 
   revalidatePath("/me");
+  revalidatePath("/me/shipping");
+  revalidatePath("/chat/[threadId]", "page");
   return { ok: true };
 }

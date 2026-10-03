@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Star } from "lucide-react";
+import { ArrowRight, Star, ShieldCheck } from "lucide-react";
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
@@ -42,6 +42,7 @@ export function ListingSellerBlock({ seller }: ListingSellerBlockProps) {
       <div className="min-w-0 flex-1">
         <p className="truncate text-[14px] font-semibold leading-[18px] text-[#1a2e1a]">
           {name}
+          {seller.phone_verified ? <ShieldCheck className="ml-1 inline size-3.5 text-[#4f5826]" aria-label="Overený telefón" /> : null}
         </p>
         <div className="mt-1 flex items-center gap-1">
           <Star className="size-[10px] fill-[#e0a500] text-[#e0a500]" aria-hidden />
@@ -57,7 +58,7 @@ export function ListingSellerBlock({ seller }: ListingSellerBlockProps) {
       </div>
       <Link
         href={`/profile/${seller.id}`}
-        className="inline-flex items-center gap-[2px] text-[12px] font-medium leading-[16px] text-[#4f5826]"
+        className="inline-flex min-h-11 items-center gap-[2px] text-[12px] font-medium leading-[16px] text-[#4f5826]"
       >
         Profil
         <ArrowRight className="size-[14px]" aria-hidden />

@@ -4,6 +4,7 @@ import Image from "next/image";
 import { Badge } from "@/components/ui/badge";
 import { formatPrice } from "@/lib/formatters";
 import { getConditionLabel, getSizeLabel } from "@/lib/listing-labels";
+import { parseEuroAmountStrict } from "@/lib/money-validation";
 import type { ListingDraft, StepErrors } from "./wizard-shell";
 
 /* ------------------------------------------------------------------ */
@@ -31,10 +32,10 @@ export function StepReview({ draft, errors, publishError, onGoToStep }: Props) {
   const hasErrors = Object.keys(errors).length > 0;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-5">
       <div>
-        <h2 className="text-base font-semibold mb-1">Zhrnutie</h2>
-        <p className="text-sm text-muted-foreground">
+        <h2 className="mb-1 text-base font-semibold text-[#232711]">Zhrnutie</h2>
+        <p className="text-sm text-[#67635c]">
           Skontrolujte inzerát pred zverejnením.
         </p>
       </div>
@@ -45,7 +46,7 @@ export function StepReview({ draft, errors, publishError, onGoToStep }: Props) {
           {draft.photos.map((photo, i) => (
             <div
               key={photo.storagePath}
-              className="relative shrink-0 size-20 rounded-lg overflow-hidden bg-muted"
+              className="relative size-20 shrink-0 overflow-hidden rounded-[12px] border border-[#e9e2d1] bg-muted"
             >
               <Image
                 fill
@@ -59,7 +60,7 @@ export function StepReview({ draft, errors, publishError, onGoToStep }: Props) {
       )}
 
       {/* Summary rows */}
-      <div className="space-y-3 rounded-xl border p-4">
+      <div className="rootie-surface space-y-3 rounded-[16px] border-[#e9e2d1] p-4 shadow-none">
         <SummaryRow
           label="Typ"
           value={
@@ -131,7 +132,7 @@ export function StepReview({ draft, errors, publishError, onGoToStep }: Props) {
             label="Cena"
             value={
               draft.fixedPrice
-                ? formatPrice(parseFloat(draft.fixedPrice))
+                ? formatPrice(parseEuroAmountStrict(draft.fixedPrice) ?? 0)
                 : "—"
             }
             hasError={!!errors.fixedPrice}
@@ -143,7 +144,7 @@ export function StepReview({ draft, errors, publishError, onGoToStep }: Props) {
               label="Začiatočná cena"
               value={
                 draft.auctionStartPrice
-                  ? formatPrice(parseFloat(draft.auctionStartPrice))
+                  ? formatPrice(parseEuroAmountStrict(draft.auctionStartPrice) ?? 0)
                   : "—"
               }
               hasError={!!errors.auctionStartPrice}
@@ -153,7 +154,7 @@ export function StepReview({ draft, errors, publishError, onGoToStep }: Props) {
               label="Min. príhoz"
               value={
                 draft.auctionMinIncrement
-                  ? formatPrice(parseFloat(draft.auctionMinIncrement))
+                  ? formatPrice(parseEuroAmountStrict(draft.auctionMinIncrement) ?? 0)
                   : "—"
               }
               hasError={!!errors.auctionMinIncrement}
@@ -172,7 +173,7 @@ export function StepReview({ draft, errors, publishError, onGoToStep }: Props) {
 
       {/* Validation / publish errors */}
       {(hasErrors || publishError) && (
-        <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-3">
+        <div className="rounded-[14px] border border-destructive/20 bg-destructive/10 p-3">
           <p className="text-sm text-destructive font-medium">
             {publishError || "Opravte chyby v predchádzajúcich krokoch."}
           </p>
@@ -213,7 +214,7 @@ function SummaryRow({
         <button
           type="button"
           onClick={onEdit}
-          className="text-xs text-primary underline shrink-0 mt-0.5"
+          className="mt-0.5 min-h-11 shrink-0 rounded-full bg-[#eef4e5] px-2.5 py-1 text-[11px] font-semibold text-[#4f5826]"
         >
           Upraviť
         </button>

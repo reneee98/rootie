@@ -1,13 +1,14 @@
 "use client";
 
 import Image from "next/image";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ArrowLeftRight, CheckCircle2, Euro, Info } from "lucide-react";
 
 import { sendMessage } from "@/lib/actions/chat";
 import {
   acceptListingPriceOffer,
   acceptListingSwapOffer,
+  declineListingOffer,
 } from "@/lib/actions/orders";
 import type { ChatMessage } from "@/lib/data/chat";
 import { formatDateTime } from "@/lib/formatters";
@@ -19,6 +20,7 @@ type MessageBubbleProps = {
   isOwn: boolean;
   threadId: string;
   canManageOffers?: boolean;
+  canAcceptPriceCounter?: boolean;
   dealConfirmed?: boolean;
   isListingThread?: boolean;
   onOrderStateChanged?: () => void;
@@ -28,7 +30,8 @@ type MessageBubbleProps = {
 function parseAmount(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   if (typeof value === "string") {
-    const parsed = parseFloat(value.replace(",", "."));
+    if (!value.trim()) return null;
+    const parsed = Number(value.replace(",", "."));
     if (Number.isFinite(parsed)) return parsed;
   }
   return null;
@@ -79,6 +82,7 @@ export function MessageBubble({
   isOwn,
   threadId,
   canManageOffers = false,
+  canAcceptPriceCounter = false,
   dealConfirmed = false,
   isListingThread = false,
   onOrderStateChanged,
@@ -90,61 +94,57 @@ export function MessageBubble({
   const [showSwapCounterInput, setShowSwapCounterInput] = useState(false);
   const [counterAmount, setCounterAmount] = useState("");
   const [swapCounterText, setSwapCounterText] = useState("");
+  const pendingRef = useRef(false);
 
-  const canActOnOffer = canManageOffers && !isOwn && !dealConfirmed;
+  const isPriceCounter = message.message_type === "offer_price" &&
+    typeof message.metadata?.counter_to_message_id === "string";
+  const canActOnOffer = (canManageOffers || (canAcceptPriceCounter && isPriceCounter)) && !isOwn && !dealConfirmed;
 
-  const handleAccept = async () => {
+  const performOfferAction = async (action: () => Promise<{ ok: boolean; error?: string }>): Promise<boolean> => {
+    if (pendingRef.current) return false;
+    pendingRef.current = true;
     setError("");
     setPending(true);
-
-    const result =
-      isListingThread && message.message_type === "offer_price"
-        ? await acceptListingPriceOffer(threadId, message.id)
-        : isListingThread && message.message_type === "offer_swap"
-          ? await acceptListingSwapOffer(threadId, message.id)
-        : await sendMessage({
-            threadId,
-            body: "Ponuka výmeny odsúhlasená",
-            messageType: "system",
-            metadata: { source_offer_message_id: message.id },
-          });
-
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
+    try {
+      const result = await action();
+      if (!result.ok) {
+        setError(result.error ?? "Akciu sa nepodarilo vykonať.");
+        return false;
+      }
+      onOrderStateChanged?.();
+      onSent?.();
+      return true;
+    } catch {
+      setError("Akciu sa nepodarilo vykonať. Skúste to znova.");
+      return false;
+    } finally {
+      setPending(false);
+      pendingRef.current = false;
     }
+  };
+
+  const handleAccept = async () => {
+    if (!canActOnOffer || !isListingThread) return;
+    const ok = await performOfferAction(() => message.message_type === "offer_price"
+      ? acceptListingPriceOffer(threadId, message.id)
+      : acceptListingSwapOffer(threadId, message.id));
+    if (!ok) return;
 
     setShowPriceCounterInput(false);
     setShowSwapCounterInput(false);
     setCounterAmount("");
     setSwapCounterText("");
-    onOrderStateChanged?.();
-    onSent?.();
   };
 
   const handleDecline = async () => {
-    setError("");
-    setPending(true);
-
-    const result = await sendMessage({
-      threadId,
-      body: "Ponuka odmietnutá",
-      messageType: "system",
-      metadata: { source_offer_message_id: message.id },
-    });
-
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
+    if (!canActOnOffer || !isListingThread) return;
+    const ok = await performOfferAction(() => declineListingOffer(threadId, message.id));
+    if (!ok) return;
 
     setShowPriceCounterInput(false);
     setShowSwapCounterInput(false);
     setCounterAmount("");
     setSwapCounterText("");
-    onSent?.();
   };
 
   const handleCounterPrice = async () => {
@@ -154,10 +154,8 @@ export function MessageBubble({
       return;
     }
 
-    setError("");
-    setPending(true);
-
-    const result = await sendMessage({
+    if (!canActOnOffer || !canManageOffers) return;
+    const ok = await performOfferAction(() => sendMessage({
       threadId,
       body: String(amount),
       messageType: "offer_price",
@@ -165,17 +163,11 @@ export function MessageBubble({
         amount_eur: amount,
         counter_to_message_id: message.id,
       },
-    });
-
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
+    }));
+    if (!ok) return;
 
     setShowPriceCounterInput(false);
     setCounterAmount("");
-    onSent?.();
   };
 
   const handleCounterSwapText = async () => {
@@ -185,24 +177,16 @@ export function MessageBubble({
       return;
     }
 
-    setError("");
-    setPending(true);
-
-    const result = await sendMessage({
+    if (!canActOnOffer || !canManageOffers) return;
+    const ok = await performOfferAction(() => sendMessage({
       threadId,
       body: text,
       messageType: "text",
-    });
-
-    setPending(false);
-    if (!result.ok) {
-      setError(result.error);
-      return;
-    }
+    }));
+    if (!ok) return;
 
     setShowSwapCounterInput(false);
     setSwapCounterText("");
-    onSent?.();
   };
 
   if (message.message_type === "system" || message.message_type === "order_status") {
@@ -239,7 +223,7 @@ export function MessageBubble({
           className={cn(
             "flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-2.5",
             isOwn
-              ? "bg-primary text-primary-foreground rounded-br-md"
+              ? "rounded-br-md bg-[#4f5826] text-white"
               : "rounded-bl-md border border-emerald-300 bg-emerald-50 text-emerald-950"
           )}
         >
@@ -281,7 +265,7 @@ export function MessageBubble({
                 >
                   Nesúhlasím
                 </Button>
-                <Button
+                {canManageOffers && <Button
                   type="button"
                   size="sm"
                   variant="outline"
@@ -293,7 +277,7 @@ export function MessageBubble({
                   disabled={pending}
                 >
                   Navrhnúť inú cenu
-                </Button>
+                </Button>}
               </div>
 
               {showPriceCounterInput && (
@@ -301,8 +285,8 @@ export function MessageBubble({
                   <input
                     type="number"
                     inputMode="decimal"
-                    min={0}
-                    step={0.5}
+                    min={0.01}
+                    step={0.01}
                     value={counterAmount}
                     onChange={(e) => setCounterAmount(e.target.value)}
                     placeholder="Suma (€)"
@@ -324,7 +308,7 @@ export function MessageBubble({
             </div>
           )}
 
-          {error && <p className="text-xs text-destructive">{error}</p>}
+          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </div>
       </div>
     );
@@ -340,7 +324,7 @@ export function MessageBubble({
           className={cn(
             "flex max-w-[85%] flex-col gap-1 rounded-2xl px-4 py-2.5",
             isOwn
-              ? "bg-primary text-primary-foreground rounded-br-md"
+              ? "rounded-br-md bg-[#4f5826] text-white"
               : "rounded-bl-md border border-amber-300 bg-amber-50 text-amber-950"
           )}
         >
@@ -454,8 +438,8 @@ export function MessageBubble({
         className={cn(
           "flex max-w-[85%] flex-col gap-0.5 rounded-2xl px-4 py-2.5",
           isOwn
-            ? "bg-primary text-primary-foreground rounded-br-md"
-            : "bg-muted rounded-bl-md"
+            ? "rounded-br-md bg-[#4f5826] text-white"
+            : "rounded-bl-md border border-[#e9e2d1] bg-[#faf8f4] text-[#232711]"
         )}
       >
         <p className="whitespace-pre-wrap break-words text-sm">{message.body}</p>
